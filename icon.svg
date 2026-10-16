@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Chat Typography">
+  <rect x="4" y="4" width="56" height="56" rx="13" fill="#247bbf"/>
+  <g stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" opacity="0.95">
+    <line x1="20" y1="20" x2="48" y2="20"/>
+    <line x1="20" y1="32" x2="48" y2="32"/>
+    <line x1="20" y1="44" x2="48" y2="44"/>
+  </g>
+  <g stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" fill="none">
+    <line x1="11" y1="20" x2="11" y2="44"/>
+  </g>
+  <g fill="#ffffff">
+    <path d="M11 16.5 14.4 21.5 7.6 21.5Z"/>
+    <path d="M11 47.5 7.6 42.5 14.4 42.5Z"/>
+  </g>
+</svg>

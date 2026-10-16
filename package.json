@@ -1,0 +1,55 @@
+{
+  "name": "@zheshiyigehenchang/dsh-chat-typography",
+  "version": "1.0.0",
+  "description": "A DSH settings page for the conversation flow: one font size for all text, one vertical rhythm for every gap, per-role font families, and a side-gutter control.",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "typography",
+    "font-size",
+    "line-height",
+    "settings",
+    "conversation"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "author": "zheshiyigehenchang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zheshiyigehenchang/dsh-chat-typography.git"
+  },
+  "homepage": "https://github.com/zheshiyigehenchang/dsh-chat-typography#readme",
+  "bugs": {
+    "url": "https://github.com/zheshiyigehenchang/dsh-chat-typography/issues"
+  },
+  "icon": "icon.svg",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "docs"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings-general",
+        "@deepseek-ai/dsh-client-ui-theme"
+      ]
+    }
+  }
+}

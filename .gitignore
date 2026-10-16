@@ -1,0 +1,15 @@
+# npm pack / publish artifacts
+*.tgz
+
+# DSH local state
+.dsh/
+
+# editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# logs
+*.log
