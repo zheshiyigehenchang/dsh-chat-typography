@@ -1,7 +1,7 @@
 {
   "name": "@zheshiyigehenchang/dsh-chat-typography",
-  "version": "1.0.0",
-  "description": "A DSH settings page for the conversation flow: one font size for all text, one vertical rhythm for every gap, per-role font families, and a side-gutter control.",
+  "version": "1.0.1",
+  "description": "设置DSH Harness对话流字体、字号行间距，以及对话文字到窗口边缘的留白。",
   "keywords": [
     "dsh",
     "dsh-plugin",
