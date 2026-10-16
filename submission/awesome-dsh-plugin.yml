@@ -1,0 +1,19 @@
+# awesome-dsh-plugin submission entry.
+#
+# Target path in the awesome-dsh-plugin repository:
+#   data/plugins/zheshiyigehenchang__dsh-chat-typography.yml
+#
+# Submit this ONE file as a PR. The two READMEs are generated from
+# data/plugins/*.yml by scripts/generate-readme.mjs — do not edit them by hand.
+#
+# Only description.en is required. `name` must be the link text shown in the
+# list, `url` must match the repository exactly.
+
+url: https://github.com/zheshiyigehenchang/dsh-chat-typography
+name: zheshiyigehenchang/dsh-chat-typography
+category: ui
+description:
+  # No half-width ": " in either string, so quoting is not required. Quote the
+  # line if you ever edit it to contain one.
+  en: A DSH settings page for the conversation flow — one font size for all text, one vertical rhythm for every gap, per-role font families, and a side-gutter control.
+  zh: 给对话流加一页排版设置：一个字号管住全文、一条网格管住所有纵向间距，另有文字/代码/终端三种角色的字体与左右留白。
