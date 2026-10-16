@@ -91,7 +91,7 @@ dsh-chat-typography/
 ├── package.json          包清单：exports / files / dsh.bundle.patch / dsh.client
 ├── cordis.patch.yml      向 profile 插入 bundle 行的 patch
 ├── index.js              Host 半个 bundle（本插件没有 Host 逻辑，只有空 apply）
-├── client.js             全部实现：设置页 + 三层样式
+├── client.js             全部实现：设置页 + 若干层样式
 ├── locale/
 │   ├── zh.json           插件列表里的显示名与简介
 │   └── en.json
