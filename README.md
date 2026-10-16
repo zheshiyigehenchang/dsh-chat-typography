@@ -74,7 +74,7 @@
 @zheshiyigehenchang/dsh-chat-typography
 ```
 
-也可以传**包目录的绝对路径**（例如 `D:\test\dsh-chat-typography`）从源码安装，管理器会：
+也可以从源码安装：先把本仓库 clone 到本地，再往管理器里传**包目录的绝对路径**（例如 `<你的克隆目录>\dsh-chat-typography`），管理器会：
 
 1. 往 `<DSH_HOME>\profiles\<profile>\package.json` 的 `dependencies` 写入 `"@zheshiyigehenchang/dsh-chat-typography": "link:<包目录>"`
 2. 把包名追加进该文件的 `dsh.profile.bundles`
