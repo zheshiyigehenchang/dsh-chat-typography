@@ -107,47 +107,6 @@ dsh-chat-typography/
 | 行距与间距 | `[data-chat-flow]`，内容随倍率重写 | 常驻（倍率 1.00 也写） |
 | 左右留白 | `:has([data-chat-flow])` 上的 `--dsh-chat-content-width` | 仅在填了数值时 |
 
-## 发布
-
-这个包已经按可发布状态准备好，`dsh.bundle` manifest、`cordis.patch.yml`、LICENSE 与发布元数据都在。发布时只需要：
-
-1. 改 `package.json` 里的 `version`
-2. 如果仓库地址有变，同步 `repository` / `homepage` / `bugs`
-
-### 发到 npm
-
-```bash
-npm login
-npm publish --access public
-```
-
-发了之后，别人在插件管理器里传包名 `@zheshiyigehenchang/dsh-chat-typography` 就能装。
-
-### 发到 DSH 市场
-
-市场读取的是 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 的精选目录，收录方式是**提一个 YAML 文件的 PR**，放到 `data/plugins/<owner>__<repo>.yml`：
-
-```yaml
-url: https://github.com/zheshiyigehenchang/dsh-chat-typography
-name: zheshiyigehenchang/dsh-chat-typography
-category: ui
-description:
-  en: A DSH settings page for the conversation flow — one font size for all text, one vertical rhythm for every gap, per-role font families, and a side-gutter control.
-  zh: 给对话流加一页排版设置：一个字号管住全文、一条网格管住所有纵向间距，另有三种角色的字体与左右留白。
-```
-
-只提交这一个文件，两个 README 由脚本生成，不要手工编辑。`description` 里如果出现半角冒号加空格必须给整行加引号。可用的 `category` 取值见投稿指南，本插件用 `ui`。
-
-收录的硬性要求是仓库的 `package.json` 声明 `dsh.bundle` manifest（**这是最常见的被拒原因——只声明 `dsh.client` 是无法安装的**），并在仓库根放 `cordis.patch.yml`；本包两条都已满足。npm 包是可选项，但没有它，市场那一页不会显示简介，也不会出现「已是最新」徽标。
-
-### 只想本地分发
-
-```bash
-npm pack
-```
-
-产出的 tgz 给对方，解包后用插件管理器指向解包目录。
-
 ## 兼容性与已知限制
 
 - **强依赖宿主内部实现**：`[data-chat-flow]` 钩子，`--dsh-chat-flow-gap`、`--dsh-chat-content-width`、`--dsl-terminal-line-height` 变量，以及 `[class*="_markdown_"]` 这类 CSS Modules 类名半段。宿主大版本升级（尤其是 `dsh-client-ui-chat` 与 `dsh-client-ui-primitives`）可能让某一层失效。类名用的是 localName 半段而不是哈希，跨构建稳定；变量名一旦改了就要跟着改。
@@ -158,4 +117,4 @@ npm pack
 
 ## 许可
 
-未指定。
+MIT，见 [LICENSE](LICENSE)。

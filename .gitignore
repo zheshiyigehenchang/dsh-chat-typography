@@ -1,6 +1,9 @@
 # npm pack / publish artifacts
 *.tgz
 
+# local-only publish checklist and market submission PR material
+submission/
+
 # DSH local state
 .dsh/
 
