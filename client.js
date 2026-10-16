@@ -24,6 +24,10 @@ window.__ModuleLoader__.load({
     const PAGE_STYLE_ID = `${PKG}/settings-page`;
     const LH_STYLE_ID = `${PKG}/line-height`;
     const FLAT_SIZE_STYLE_ID = `${PKG}/uniform-font-size`;
+    const BARE_CODE_STYLE_ID = `${PKG}/bare-inline-code`;
+    const TIGHT_TABLE_STYLE_ID = `${PKG}/tight-table`;
+    const TIGHT_CODE_CARD_STYLE_ID = `${PKG}/tight-code-card`;
+    const TIGHT_HEADER_STYLE_ID = `${PKG}/tight-header`;
 
     /** Independently configurable font roles, matching the Appearance section. */
     const ROLES = ['text', 'code', 'terminal'];
@@ -326,6 +330,166 @@ window.__ModuleLoader__.load({
     const FLAT_SIZE_CSS =
       '[data-chat-flow][data-chat-flow] *:not(textarea):not(input):not(svg):not(svg *)' +
       '{font-size:var(--dsh-content-font-size,14px)!important}';
+
+    /**
+     * Inline code as plain monospace text, with no chip of its own.
+     *
+     * The host paints `:not(pre) > code` as a chip — `--dsw-alias-markdown-inline-code`
+     * fill, a hairline border, 5px of side padding and a small radius — but a run of
+     * inline code that the deliverables bundle resolved against a produced or
+     * delivered file is rewritten into a `_fileMention_` button, and that rule resets
+     * `background` and `border` to nothing. Two runs that read identically in the
+     * prose therefore wore two different outfits. This layer drops the chip from
+     * both, so inline code is monospace and nothing else.
+     *
+     * The doubled attribute selector is what gets there: the host's chip rule is one
+     * class plus a type selector, so `[data-chat-flow][data-chat-flow]` outranks it
+     * whatever order the sheets land in. The host's spec is the one being overridden,
+     * and it is not `!important`, so no `!important` is needed here.
+     *
+     * Scope is deliberately narrow — only `code`, only inside `[data-chat-flow]`, and
+     * `:not(pre) > code` so code blocks, the composer's fields and the terminal keep
+     * their own surfaces. The `padding` reset also covers the `[data-markdown-variant="compact"]`
+     * variant used by reasoning rows, which carries `padding: 0 3px` and no fill.
+     */
+    const BARE_CODE_CSS =
+      '[data-chat-flow][data-chat-flow] [class*="_markdown_"] :not(pre)>code,' +
+      '[data-chat-flow][data-chat-flow] [class*="_markdown_"] [class*="_fileMention_"]' +
+      '{background-color:transparent;border:none;padding:0;border-radius:0}';
+
+    /**
+     * Tighter markdown table cells.
+     *
+     * The host pads every `th`/`td` with `padding: 10px 16px`, and then reclaims the
+     * outer edges — `th:first-child, td:first-child { padding-left: 0 }` and
+     * `td:last-child { padding-right: 0 }`. What a reader actually sees is therefore
+     * 16px of gutter between columns plus 10px above and below every line, which
+     * makes a short table drift apart vertically.
+     *
+     * The vertical trim is the half that matters: 10px on each side of a ~22px line
+     * box is nearly half the row height. Rows stay readable because each cell keeps
+     * its own `border-bottom`.
+     *
+     * Trimming the shorthand alone would not be enough. The host's edge rules are two
+     * classes deep at most, so this layer's doubled attribute selector outranks them
+     * and `padding: 5px 8px` would silently re-indent the first and last columns,
+     * undoing the flush edges the host deliberately set. Those two edges are
+     * therefore restored by hand, with the same `:first-child` / `:last-child` shape
+     * the host uses.
+     */
+    const TIGHT_TABLE_CSS =
+      '[data-chat-flow][data-chat-flow] [class*="_tableScroll_"] :is(th,td)' +
+      '{padding:5px 8px}' +
+      '[data-chat-flow][data-chat-flow] [class*="_tableScroll_"] :is(th,td):first-child' +
+      '{padding-left:0}' +
+      '[data-chat-flow][data-chat-flow] [class*="_tableScroll_"] td:last-child' +
+      '{padding-right:0}';
+
+    /**
+     * Code cards with less air inside, and no paragraph rhythm around anything.
+     *
+     * A fenced block is rendered as `.block` (banner + `<pre>`) and, when the
+     * renderer picks that shape, `.card`. Two different paddings apply:
+     *
+     *   .block :where(pre) -> padding: 16px          (all four sides)
+     *   .card  :where(pre) -> padding: 6px 22px 20px (top / sides / bottom)
+     *
+     * The card's numbers are the ones that read wrong: 6px under the banner but a
+     * full 20px below the last line, so the text sits high and the card trails off
+     * into empty space. The block variant is symmetric but simply generous.
+     *
+     * Both are trimmed to the same vertical value. The horizontal padding is left
+     * exactly as the host set it for each variant — 22px on the card, 16px on the
+     * plain block — since that is what aligns the code with the banner label above
+     * it, and narrowing it would break that alignment rather than tighten spacing.
+     *
+     * `:where()` contributes no specificity, so the host's own selector is just
+     * `.block :where(pre)` — one class. The doubled attribute selector outranks it.
+     *
+     * The `<pre>` is a descendant of the `.block` wrapper, not the wrapper itself,
+     * so the class match is on the ancestor and `pre` is the subject of the rule.
+     * Declared after the table layer only for readability; the two touch disjoint
+     * elements.
+     *
+     * ---
+     *
+     * The rest of the sheet is the body's paragraph rhythm, set to zero.
+     *
+     * Measured against the real tree — the assistant body is
+     * `[data-chat-flow] > .Y0dWHa_markdownPayload > ._markdown_ > <block>` — the
+     * host was charging a full 16px above and below every block, 32px around
+     * headings and rules, and 6px between list items. Two sheets are in play and
+     * they disagree: dsh-client-ui-trajectory re-states `margin:8px 0` for
+     * `:where(p,ul,ol)` inside `.markdownPayload`, but `:where()` contributes no
+     * specificity, so that rule loses to the base `._markdown_ p{margin:16px 0}`.
+     * The trajectory spacing is dead code in this tree.
+     *
+     * Margin collapsing is why the card and the prose cannot be tuned separately:
+     * adjacent vertical margins collapse to the larger of the two, so an 8px card
+     * margin next to a 16px paragraph margin still yields a 16px gap — measured, not
+     * assumed. Zeroing the whole rhythm is the consistent answer, and it covers every
+     * block that carries spacing rather than leaving headings (32px), lists (16px),
+     * rules (32px) and blockquotes still opening gaps.
+     *
+     * Headings and rules are zeroed too. At 0px a heading is separated from the prose
+     * only by its own larger type, which is what "no paragraph rhythm" means. If a
+     * heading ever needs air back, this is the one rule to split.
+     *
+     * `li:not(:first-child)` is included so list items sit flush; the host's 6px is
+     * part of the same rhythm. `li>p` is left alone — the host already zeroes a list
+     * item's own paragraph margins, and those paragraphs are `display:inline` inside
+     * nested lists.
+     *
+     * The selectors take only the top and bottom longhands, leaving the host's zero
+     * side margins intact, and no `!important` appears anywhere: the host's margins
+     * are not `!important` either. The inner `<pre>`'s `margin: 0 !important` is a
+     * different element and stays.
+     */
+    const TIGHT_CODE_CARD_CSS =
+      '[data-chat-flow][data-chat-flow] [class*="_block_"] pre' +
+      '{padding-top:8px;padding-bottom:8px}' +
+      '[data-chat-flow][data-chat-flow] .md-code-block,' +
+      '[data-chat-flow][data-chat-flow] [class*="_markdown_"] :where(p,ul,ol,h1,h2,h3,h4,h5,h6,blockquote,hr)' +
+      '{margin-top:0;margin-bottom:0}' +
+      '[data-chat-flow][data-chat-flow] [class*="_markdown_"] li:not(:first-child)' +
+      '{margin-top:0}';
+
+    /**
+     * Shorter conversation header.
+     *
+     * The header is `header.wSkVaW_header` from dsh-client-ui-conversation, which
+     * injects its own sheet at runtime rather than shipping in the frontend CSS
+     * bundle — hence the `wSkVaW_` prefix and the runtime sheet as the source of
+     * truth here. Measured at 51px: `padding:10px 28px 0 20px` from the host plus
+     * `padding-bottom:10px` from its no-tabs rule, a 30px `.titleRow`
+     * (`min-height:30px`), and the 1px bottom hairline.
+     *
+     * Two levers move it, and they are not equally safe:
+     *
+     *  - The 10px/10px block padding is the honest one — it is pure breathing room.
+     *    Trimming each to 5px costs 10px and leaves every child's own box untouched.
+     *  - `.titleRow`'s `min-height:30px` is worth only 2px (the row measures 28px on
+     *    its own), so it is not worth reaching for.
+     *
+     * The crumb's `padding:4px 8px` and `line-height:20px` are deliberately left
+     * alone: measured, they change the header by 0px. Swept in a browser, the
+     * padding maps to height one-for-one (7px→45, 5px→41, 3px→37, 0→31), so the
+     * only question was how much air to keep around the title; 5px leaves the text
+     * clear of both the top edge and the bottom hairline.
+     *
+     * The `:not(:has(.wSkVaW_tabs))` guard matters. The host's own rule only floors
+     * the header at 76px when a tab row is present (`showTabs = tabs.length > 1`);
+     * with the guard dropped, a session that grows tabs would lose that floor and
+     * the tab strip would collide with the content. Reproduced in a browser: 51px
+     * normally, 76px with tabs, and this layer keeps the tabs case at 76px.
+     *
+     * The doubled class in the leading selector is the same trick used above: the
+     * host's rules are single-class, so this outranks them whatever order the sheets
+     * land in, and no `!important` is needed because the host's are not `!important`.
+     */
+    const TIGHT_HEADER_CSS =
+      'header.wSkVaW_header.wSkVaW_header:not(:has(.wSkVaW_tabs))' +
+      '{padding-top:5px;padding-bottom:5px}';
 
     /** Create or reuse this bundle's own style tag for one sheet id. */
     function mountStyle(id, css) {
@@ -635,6 +799,26 @@ window.__ModuleLoader__.load({
           const tag = mountStyle(FLAT_SIZE_STYLE_ID, FLAT_SIZE_CSS);
           return () => unmountStyle(tag);
         }, 'chat-typography: uniform font size');
+
+        ctx.effect(() => {
+          const tag = mountStyle(BARE_CODE_STYLE_ID, BARE_CODE_CSS);
+          return () => unmountStyle(tag);
+        }, 'chat-typography: bare inline code');
+
+        ctx.effect(() => {
+          const tag = mountStyle(TIGHT_TABLE_STYLE_ID, TIGHT_TABLE_CSS);
+          return () => unmountStyle(tag);
+        }, 'chat-typography: tight table cells');
+
+        ctx.effect(() => {
+          const tag = mountStyle(TIGHT_CODE_CARD_STYLE_ID, TIGHT_CODE_CARD_CSS);
+          return () => unmountStyle(tag);
+        }, 'chat-typography: tight code card');
+
+        ctx.effect(() => {
+          const tag = mountStyle(TIGHT_HEADER_STYLE_ID, TIGHT_HEADER_CSS);
+          return () => unmountStyle(tag);
+        }, 'chat-typography: tight header');
 
         ctx.effect(() => ctx.on('theme/change', bump), 'chat-typography: theme subscription');
 
