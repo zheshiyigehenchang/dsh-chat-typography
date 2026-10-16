@@ -99,13 +99,20 @@ dsh-chat-typography/
 └── docs/                 README 里的截图
 ```
 
-`client.js` 里叠了三层样式，各自独立注入一个 `<style data-plugin-css=...>`：
+`client.js` 里叠了若干层样式，各自独立注入一个 `<style data-plugin-css=...>`：
 
 | 层 | 作用域 | 是否常驻 |
 | --- | --- | --- |
 | 统一字号 | `[data-chat-flow]` 内除输入控件与图标 | 常驻 |
 | 行距与间距 | `[data-chat-flow]`，内容随倍率重写 | 常驻（倍率 1.00 也写） |
+| 正文节奏归零 | `[data-chat-flow]` 内 markdown 的段落 / 列表 / 标题 / 引用 / 分割线 | 常驻 |
+| 行内代码去底色 | `[data-chat-flow]` 内 markdown 的 `:not(pre)>code` 与文件提及 | 常驻 |
+| 表格单元格收紧 | `[data-chat-flow]` 内 markdown 表格 | 常驻 |
+| 代码卡片收紧 | `[data-chat-flow]` 内代码块、卡片 | 常驻 |
+| 标题栏收紧 | `header.wSkVaW_header`（无标签行时） | 常驻 |
 | 左右留白 | `:has([data-chat-flow])` 上的 `--dsh-chat-content-width` | 仅在填了数值时 |
+
+后四层（正文节奏、行内代码、表格、代码卡片、标题栏）是**固定的紧凑化**，不提供开关，也不随上面任何设置变化。其共同做法是靠提高选择器特异性取胜（重复属性选择器 `[data-chat-flow][data-chat-flow]`、重复类名 `header.wSkVaW_header.wSkVaW_header`），**不使用 `!important`** —— 因为被覆盖的宿主规则本身都不是 `!important`。
 
 ## 兼容性与已知限制
 
