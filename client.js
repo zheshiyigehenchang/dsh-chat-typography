@@ -386,7 +386,7 @@ window.__ModuleLoader__.load({
       '{padding-right:0}';
 
     /**
-     * Code cards with less air inside, and no paragraph rhythm around anything.
+     * Code cards with less air inside.
      *
      * A fenced block is rendered as `.block` (banner + `<pre>`) and, when the
      * renderer picks that shape, `.card`. Two different paddings apply:
@@ -411,39 +411,39 @@ window.__ModuleLoader__.load({
      * Declared after the table layer only for readability; the two touch disjoint
      * elements.
      *
-     * ---
+     * The space *around* the card is not in scope here: the line-height sheet owns
+     * it and holds it at `16px × 倍率`, because a card wears a background and a
+     * zero margin would fuse it onto the prose.
+     */
+    /**
+     * Note on this constant's margin rules: they are dead weight, and are due to be
+     * deleted.
      *
-     * The rest of the sheet is the body's paragraph rhythm, set to zero.
+     * The line-height sheet already zeroes the markdown text blocks, and it wins
+     * every conflict twice over: its selector
+     * `[data-chat-flow] [class*="_markdown_"]:not([data-markdown-variant="compact"]) :is(p,…)`
+     * is deeper than these rules, and it is emitted after them. Measured with both
+     * sheets loaded and both orderings, `p`, `ul`, `ol`, `li`, `blockquote` and the
+     * headings read 0px either way, and the card reads `16px × 倍率` either way —
+     * so nothing here changes a computed value.
      *
-     * Measured against the real tree — the assistant body is
-     * `[data-chat-flow] > .Y0dWHa_markdownPayload > ._markdown_ > <block>` — the
-     * host was charging a full 16px above and below every block, 32px around
-     * headings and rules, and 6px between list items. Two sheets are in play and
-     * they disagree: dsh-client-ui-trajectory re-states `margin:8px 0` for
-     * `:where(p,ul,ol)` inside `.markdownPayload`, but `:where()` contributes no
-     * specificity, so that rule loses to the base `._markdown_ p{margin:16px 0}`.
-     * The trajectory spacing is dead code in this tree.
+     * Worse, the margin rules state the *opposite* intent for boxed blocks: they
+     * zero `.md-code-block` and `hr`, while the line-height sheet deliberately keeps
+     * `16px × 倍率` around `pre`, `hr`, `.md-code-block` and `table` so those boxes
+     * do not fuse onto the prose. The line-height sheet is the one that wins, which
+     * is the right outcome — but a reader of this constant would conclude the
+     * opposite, and if sheet order ever changed, `hr` and the card would silently
+     * collapse.
      *
-     * Margin collapsing is why the card and the prose cannot be tuned separately:
-     * adjacent vertical margins collapse to the larger of the two, so an 8px card
-     * margin next to a 16px paragraph margin still yields a 16px gap — measured, not
-     * assumed. Zeroing the whole rhythm is the consistent answer, and it covers every
-     * block that carries spacing rather than leaving headings (32px), lists (16px),
-     * rules (32px) and blockquotes still opening gaps.
+     * What this layer genuinely owns is the inner padding on the `<pre>`: the host
+     * charges 16px on all four sides, this trims the vertical pair to 8px, and the
+     * horizontal padding is left alone because it is what aligns the code with the
+     * banner label above it. That rule is not in conflict with anything.
      *
-     * Headings and rules are zeroed too. At 0px a heading is separated from the prose
-     * only by its own larger type, which is what "no paragraph rhythm" means. If a
-     * heading ever needs air back, this is the one rule to split.
-     *
-     * `li:not(:first-child)` is included so list items sit flush; the host's 6px is
-     * part of the same rhythm. `li>p` is left alone — the host already zeroes a list
-     * item's own paragraph margins, and those paragraphs are `display:inline` inside
-     * nested lists.
-     *
-     * The selectors take only the top and bottom longhands, leaving the host's zero
-     * side margins intact, and no `!important` appears anywhere: the host's margins
-     * are not `!important` either. The inner `<pre>`'s `margin: 0 !important` is a
-     * different element and stays.
+     * The card's own `margin: 16px 0` / `:not(:last-child){margin-bottom:11px}` are
+     * therefore left to the line-height sheet too; tuning the card alone would have
+     * been pointless anyway, since adjacent vertical margins collapse to the larger
+     * of the two and the surrounding paragraphs carry their own margin.
      */
     const TIGHT_CODE_CARD_CSS =
       '[data-chat-flow][data-chat-flow] [class*="_block_"] pre' +
