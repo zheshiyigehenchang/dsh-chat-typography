@@ -208,6 +208,15 @@ window.__ModuleLoader__.load({
       const compact = `${scope} [data-markdown-variant="compact"]`;
       return [
         `${scope}{--dshct-lh:${mult}}`,
+        /**
+         * The same line box as a unitless number, for the few surfaces that take
+         * a `line-height` multiplier rather than a length — a GenUI table cell
+         * declares `line-height: 1.5` for itself and has to be pointed back at
+         * the conversation's own rhythm.
+         */
+        `:has([data-chat-flow]){--dshct-lh-box:${
+          Math.round(Number(mult) * 100) / 100
+        }}`,
         // The exclusions keep the line box off the composer's fields and off icon
         // geometry, where it would only add dead height.
         `${scope}[data-chat-flow] *:not(textarea):not(input):not(svg):not(svg *)` +
@@ -370,8 +379,8 @@ window.__ModuleLoader__.load({
      * The host pads every `th`/`td` with `padding: 10px 16px`, and then reclaims the
      * outer edges — `th:first-child, td:first-child { padding-left: 0 }` and
      * `td:last-child { padding-right: 0 }`. What a reader actually sees is therefore
-     * 16px of gutter between columns plus 10px above and below every line, which
-     * makes a short table drift apart vertically.
+     * 32px between two columns plus 10px above and below every line, which makes a
+     * short table drift apart in both directions.
      *
      * The vertical trim is the half that matters, and it goes all the way to zero.
      * The line-height sheet puts every row on the same 20.8px line box as the
@@ -379,26 +388,57 @@ window.__ModuleLoader__.load({
      * height of its own: any vertical padding makes each row taller than a line
      * of text, and a table is the one block a reader compares against the
      * paragraphs nearest to it. Rows stay apart because each cell keeps its own
-     * `border-bottom`. Measured at a 1.30 rhythm, zero gives a 25px row step
+     * `border-bottom`. Measured at a 1.30 rhythm, zero gives a 23px row step
      * against 33px at the 5px it used to carry.
      *
-     * The horizontal 8px is untouched; the 16px the host charges between columns
-     * is the one thing that keeps a dense table readable.
+     * The horizontal half is zero too, for the same reason read sideways. A cell is
+     * either a label or a value in a block that already reads as a list: on a wide
+     * window the two-to-six words in it do not need 16px of breathing room to be
+     * told apart, and the on-screen distance between two columns is the 16px gap
+     * the host already grants each side. At the default gutter that took a
+     * two-column key/value table from 488px wide to 456px, well inside the column,
+     * which is where a table belongs — the host only scrolls one once it would
+     * overflow the measure.
      *
      * Trimming the shorthand alone would not be enough. The host's edge rules are two
      * classes deep at most, so this layer's doubled attribute selector outranks them
-     * and `padding: 0 8px` would silently re-indent the first and last columns,
+     * and `padding: 0` would silently re-indent the first and last columns,
      * undoing the flush edges the host deliberately set. Those two edges are
      * therefore restored by hand, with the same `:first-child` / `:last-child` shape
      * the host uses.
+     *
+     * The same trim is owed to the tables a GenUI plugin draws — `table`,
+     * `keyvalue`, `list` and the rest are rendered by `@changfenhuang/dsh-genui`,
+     * not by the markdown renderer, so nothing above reaches them. Its cells are
+     * `padding: 9px 12px` (head) and `10px 12px` (body), and those are what made
+     * a five-row build report look loose: 20px of air around a 16px line box is
+     * more than the line itself.
+     *
+     * The class name is not a guess. GenUI ships CSS-module names with a
+     * generated hash (`V1MMBW_table`, `V1MMBW_tableWrap`), so the match has to be
+     * a substring — but `[class*="_table_"]` finds nothing, because `_table` is
+     * followed by a capital `W` and never by an underscore. The searchable stem
+     * is the bare element name, `_table`, which both GenUI names carry. Its rules
+     * are one class deep, so the doubled attribute selector outranks them the same
+     * way it does the host's.
+     *
+     * Here the horizontal padding is *kept*: a GenUI table draws its own rounded
+     * border and the cell text has to clear it, and its columns are often strings
+     * (`out\rel64\SPDF.exe`) rather than two words that read as a pair.
      */
     const TIGHT_TABLE_CSS =
       '[data-chat-flow][data-chat-flow] [class*="_tableScroll_"] :is(th,td)' +
-      '{padding:0 8px}' +
+      '{padding:0}' +
       '[data-chat-flow][data-chat-flow] [class*="_tableScroll_"] :is(th,td):first-child' +
       '{padding-left:0}' +
       '[data-chat-flow][data-chat-flow] [class*="_tableScroll_"] td:last-child' +
-      '{padding-right:0}';
+      '{padding-right:0}' +
+      '[data-chat-flow][data-chat-flow] [class*="_table"] :is(th,td)' +
+      '{padding-top:0;padding-bottom:0}' +
+      /* The cell's line box, put back on the conversation's own rhythm: GenUI
+         writes a literal 1.5 while the prose around it follows the multiplier. */
+      '[data-chat-flow][data-chat-flow] [class*="_table"] td' +
+      '{line-height:var(--dshct-lh-box,1.5)}';
 
     /**
      * Code cards with less air inside and none around.
@@ -776,6 +816,9 @@ window.__ModuleLoader__.load({
         }, 'chat-typography: line-height layer');
 
         let gutterTag = null;
+        /** The two sheets `hoistAfterRhythm` keeps after the rhythm layer. */
+        let tableTag = null;
+        let codeCardTag = null;
         /** Same deal as the line-height sheet: rewritten whenever the value changes. */
         const renderGutter = () => {
           if (gutterTag === null) return;
@@ -790,10 +833,37 @@ window.__ModuleLoader__.load({
           };
         }, 'chat-typography: side-gutter layer');
 
+        /**
+         * The two layers whose declarations must land after the rhythm sheet's.
+         *
+         * Most tightening rules out-rank the rhythm sheet on specificity alone and
+         * need no help. The table cells do not: their padding shorthand is two
+         * selectors deep, exactly like the line-height sheet's
+         * `:not([data-markdown-variant="compact"])` prefix, and a tie between them
+         * is broken by source order. The table layer wins today only because its
+         * `ctx.effect` happens to run after the rhythm sheet's — an accident of
+         * registration order that survives a page load but not a rebuild, since a
+         * changed sheet moves its tag to the end of `<head>`.
+         *
+         * Moving both tags to the end of the document on every rhythm change makes
+         * the order say what the code means. Only these two: the header layer is
+         * left where it is because its selector carries two classes and never
+         * ties, and keeping the set small keeps the cost of re-appending to a
+         * no-op when nothing else moved.
+         */
+        const hoistAfterRhythm = () => {
+          for (const tag of [tableTag, codeCardTag]) {
+            if (tag !== null && tag.parentNode === document.head) {
+              document.head.appendChild(tag);
+            }
+          }
+        };
+
         const setLineHeight = (value) => {
           lineHeight = normalizeLineHeight(value);
           writeLineHeight(lineHeight);
           renderLineHeight();
+          hoistAfterRhythm();
           bump();
         };
         const setGutter = (value) => {
@@ -828,13 +898,21 @@ window.__ModuleLoader__.load({
         }, 'chat-typography: bare inline code');
 
         ctx.effect(() => {
-          const tag = mountStyle(TIGHT_TABLE_STYLE_ID, TIGHT_TABLE_CSS);
-          return () => unmountStyle(tag);
+          tableTag = mountStyle(TIGHT_TABLE_STYLE_ID, TIGHT_TABLE_CSS);
+          hoistAfterRhythm();
+          return () => {
+            unmountStyle(tableTag);
+            tableTag = null;
+          };
         }, 'chat-typography: tight table cells');
 
         ctx.effect(() => {
-          const tag = mountStyle(TIGHT_CODE_CARD_STYLE_ID, TIGHT_CODE_CARD_CSS);
-          return () => unmountStyle(tag);
+          codeCardTag = mountStyle(TIGHT_CODE_CARD_STYLE_ID, TIGHT_CODE_CARD_CSS);
+          hoistAfterRhythm();
+          return () => {
+            unmountStyle(codeCardTag);
+            codeCardTag = null;
+          };
         }, 'chat-typography: tight code card');
 
         ctx.effect(() => {
