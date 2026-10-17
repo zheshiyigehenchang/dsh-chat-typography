@@ -438,7 +438,22 @@ window.__ModuleLoader__.load({
       /* The cell's line box, put back on the conversation's own rhythm: GenUI
          writes a literal 1.5 while the prose around it follows the multiplier. */
       '[data-chat-flow][data-chat-flow] [class*="_table"] td' +
-      '{line-height:var(--dshct-lh-box,1.5)}';
+      '{line-height:var(--dshct-lh-box,1.5)}' +
+      /**
+       * A callout is the same bargain as a table row: a box whose whole job is to
+       * hold two lines of text. GenUI gives it `padding: 12px 15px` top and bottom
+       * of a 60px box that carries 35px of content, so a third of its height is
+       * air. Halved to 6px, and the 3px it puts between title and body left alone
+       * — the two lines are one statement and read as a unit either way.
+       *
+       * `:not([class*="Title"]):not([class*="Body"])` is not defensive noise. The
+       * box, its title and its body all carry `_callout` in their class name, so a
+       * bare substring match pads all three and lands a 28px title inside a 6px
+       * frame — the box grows instead of shrinking.
+       */
+      '[data-chat-flow][data-chat-flow] [class*="_callout"]' +
+      ':not([class*="Title"]):not([class*="Body"])' +
+      '{padding-top:6px;padding-bottom:6px}';
 
     /**
      * Code cards with less air inside and none around.
