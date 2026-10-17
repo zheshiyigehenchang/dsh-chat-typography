@@ -226,12 +226,19 @@ window.__ModuleLoader__.load({
         `${md} li:not(:first-child){margin-top:0}`,
         `${md} li > :is(p,ul,ol,blockquote){margin-top:0;margin-bottom:0}`,
         /**
-         * Boxed blocks keep the gap. A code block, a table and a rule wear a
-         * border or a background of their own, and a zero margin would fuse that
-         * box onto the text above and below it. The padding inside those boxes is
-         * extra room, not a line step.
+         * Boxed blocks keep a gap. A table and a rule still need one: a table has
+         * no background of its own, so a zero margin lets the first row's text sit
+         * flush against the paragraph above it.
          */
-        `${md} :is(pre,hr,.md-code-block,table){margin-top:${blockGap};margin-bottom:${blockGap}}`,
+        `${md} :is(pre,hr,table){margin-top:${blockGap};margin-bottom:${blockGap}}`,
+        /**
+         * A code card is the exception, set just below. Kept as its own rule
+         * because the tightening sheet that zeroes it is emitted into a separate
+         * style tag and out-specifies this one, so the card's margin there wins.
+         * Naming it separately here keeps the two rules readable side by side
+         * instead of hiding the exception inside the `:is()` list.
+         */
+        `${md} .md-code-block{margin-top:${blockGap};margin-bottom:${blockGap}}`,
         // Reasoning rows render the compact markdown variant, which the host
         // marks with a data attribute rather than with a class.
         `${compact} :is(p,ul,ol,blockquote){margin-top:0;margin-bottom:0}`,
@@ -386,7 +393,7 @@ window.__ModuleLoader__.load({
       '{padding-right:0}';
 
     /**
-     * Code cards with less air inside.
+     * Code cards with less air inside and none around.
      *
      * A fenced block is rendered as `.block` (banner + `<pre>`) and, when the
      * renderer picks that shape, `.card`. Two different paddings apply:
@@ -411,45 +418,47 @@ window.__ModuleLoader__.load({
      * Declared after the table layer only for readability; the two touch disjoint
      * elements.
      *
-     * The space *around* the card is not in scope here: the line-height sheet owns
-     * it and holds it at `16px × 倍率`, because a card wears a background and a
-     * zero margin would fuse it onto the prose.
-     */
-    /**
-     * Note on this constant's margin rules: they are dead weight, and are due to be
-     * deleted.
+     * The space *around* the card belongs to the line-height sheet, which sets
+     * its margin to `16px × 倍率`. The margin rules below are what take the card
+     * back off that grid, so the layer owns the card's outer margin after all.
      *
-     * The line-height sheet already zeroes the markdown text blocks, and it wins
-     * every conflict twice over: its selector
-     * `[data-chat-flow] [class*="_markdown_"]:not([data-markdown-variant="compact"]) :is(p,…)`
-     * is deeper than these rules, and it is emitted after them. Measured with both
-     * sheets loaded and both orderings, `p`, `ul`, `ol`, `li`, `blockquote` and the
-     * headings read 0px either way, and the card reads `16px × 倍率` either way —
-     * so nothing here changes a computed value.
+     * The card's outer margin is deliberately zero. Measured at a 1.30 rhythm,
+     * the box cost a full rhythm gap plus its own 8px of inner padding on each
+     * side of the code, for a box that already wears a background. Zeroing both
+     * edges is what turns the card into one more block on the text grid.
      *
-     * Worse, the margin rules state the *opposite* intent for boxed blocks: they
-     * zero `.md-code-block` and `hr`, while the line-height sheet deliberately keeps
-     * `16px × 倍率` around `pre`, `hr`, `.md-code-block` and `table` so those boxes
-     * do not fuse onto the prose. The line-height sheet is the one that wins, which
-     * is the right outcome — but a reader of this constant would conclude the
-     * opposite, and if sheet order ever changed, `hr` and the card would silently
-     * collapse.
+     * Zeroing the card alone is what the neighbouring paragraphs make work: they
+     * are already at 0px from the line-height sheet, and adjacent vertical margins
+     * collapse to the larger of the two, so the card and the prose share one edge
+     * instead of adding up.
      *
-     * What this layer genuinely owns is the inner padding on the `<pre>`: the host
+     * The text rules restated here (`p`, `ul`, headings, …) are redundant with the
+     * line-height sheet, which emits them first at equal specificity. They are
+     * kept because that sheet's gap is tunable and this constant's is not: if the
+     * two ever disagree, the fixed behavioural rule should win.
+     *
+     * `hr` is deliberately not in that list. A rule between two paragraphs is a
+     * separator, and giving it no margin on either side is worse than the air it
+     * was given.
+     *
+     * The card selector is longer than the rest on purpose. A tie on specificity
+     * is broken by source order, and that only works if the two declarations
+     * really are a tie: the line-height sheet writes the card as
+     * `:not([data-markdown-variant="compact"]) .md-code-block`, one attribute
+     * heavier than a bare `.md-code-block`, so it would win the tie against the
+     * short form. Naming the two classes the card element itself carries puts
+     * this rule above it whatever order the tags land in.
+     *
+     * What this layer uniquely owns is the inner padding on the `<pre>`: the host
      * charges 16px on all four sides, this trims the vertical pair to 8px, and the
-     * horizontal padding is left alone because it is what aligns the code with the
-     * banner label above it. That rule is not in conflict with anything.
-     *
-     * The card's own `margin: 16px 0` / `:not(:last-child){margin-bottom:11px}` are
-     * therefore left to the line-height sheet too; tuning the card alone would have
-     * been pointless anyway, since adjacent vertical margins collapse to the larger
-     * of the two and the surrounding paragraphs carry their own margin.
+     * horizontal padding is left alone because it is what aligns the code with
+     * the banner label above it. That rule is not in conflict with anything.
      */
     const TIGHT_CODE_CARD_CSS =
       '[data-chat-flow][data-chat-flow] [class*="_block_"] pre' +
       '{padding-top:8px;padding-bottom:8px}' +
-      '[data-chat-flow][data-chat-flow] .md-code-block,' +
-      '[data-chat-flow][data-chat-flow] [class*="_markdown_"] :where(p,ul,ol,h1,h2,h3,h4,h5,h6,blockquote,hr)' +
+      '[data-chat-flow][data-chat-flow] [class*="_markdown_"] .md-code-block.md-code-block,' +
+      '[data-chat-flow][data-chat-flow] [class*="_markdown_"] :where(p,ul,ol,h1,h2,h3,h4,h5,h6,blockquote)' +
       '{margin-top:0;margin-bottom:0}' +
       '[data-chat-flow][data-chat-flow] [class*="_markdown_"] li:not(:first-child)' +
       '{margin-top:0}';
@@ -795,6 +804,11 @@ window.__ModuleLoader__.load({
           setGutter(null);
         };
 
+        /**
+         * Two of the tightenings below change a computed value: the card's zero
+         * margin and the table's zero vertical margin. Neither needs to out-rank
+         * the rhythm sheet, because the selector on each is the heavier one.
+         */
         ctx.effect(() => {
           const tag = mountStyle(FLAT_SIZE_STYLE_ID, FLAT_SIZE_CSS);
           return () => unmountStyle(tag);
