@@ -373,20 +373,28 @@ window.__ModuleLoader__.load({
      * 16px of gutter between columns plus 10px above and below every line, which
      * makes a short table drift apart vertically.
      *
-     * The vertical trim is the half that matters: 10px on each side of a ~22px line
-     * box is nearly half the row height. Rows stay readable because each cell keeps
-     * its own `border-bottom`.
+     * The vertical trim is the half that matters, and it goes all the way to zero.
+     * The line-height sheet puts every row on the same 20.8px line box as the
+     * prose, so a table only matches the text grid around it if the cell adds no
+     * height of its own: any vertical padding makes each row taller than a line
+     * of text, and a table is the one block a reader compares against the
+     * paragraphs nearest to it. Rows stay apart because each cell keeps its own
+     * `border-bottom`. Measured at a 1.30 rhythm, zero gives a 25px row step
+     * against 33px at the 5px it used to carry.
+     *
+     * The horizontal 8px is untouched; the 16px the host charges between columns
+     * is the one thing that keeps a dense table readable.
      *
      * Trimming the shorthand alone would not be enough. The host's edge rules are two
      * classes deep at most, so this layer's doubled attribute selector outranks them
-     * and `padding: 5px 8px` would silently re-indent the first and last columns,
+     * and `padding: 0 8px` would silently re-indent the first and last columns,
      * undoing the flush edges the host deliberately set. Those two edges are
      * therefore restored by hand, with the same `:first-child` / `:last-child` shape
      * the host uses.
      */
     const TIGHT_TABLE_CSS =
       '[data-chat-flow][data-chat-flow] [class*="_tableScroll_"] :is(th,td)' +
-      '{padding:5px 8px}' +
+      '{padding:0 8px}' +
       '[data-chat-flow][data-chat-flow] [class*="_tableScroll_"] :is(th,td):first-child' +
       '{padding-left:0}' +
       '[data-chat-flow][data-chat-flow] [class*="_tableScroll_"] td:last-child' +
