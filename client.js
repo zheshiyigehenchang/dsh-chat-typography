@@ -440,6 +440,21 @@ window.__ModuleLoader__.load({
       '[data-chat-flow][data-chat-flow] [class*="_table"] td' +
       '{line-height:var(--dshct-lh-box,1.5)}' +
       /**
+       * `keyvalue` never reaches the rule above: GenUI draws it as a column of
+       * `div.kvRow` rather than a `<table>`, each one `padding: 7px 0` around a
+       * 16px line. At 30.6px a row is nearly twice the text it holds, and a
+       * build report is four or five of them in a stack.
+       *
+       * Zero, on the same reasoning as a table cell: the row already carries its
+       * own hairline `border-top`, which is what separates one pair from the next.
+       * It goes to 14px of air back to being 0.
+       */
+      '[data-chat-flow][data-chat-flow] [class*="_kvRow"]' +
+      '{padding-top:0;padding-bottom:0}' +
+      /* Same literal `1.5` as a table cell, same way back to the rhythm. */
+      '[data-chat-flow][data-chat-flow] [class*="_kvValue"]' +
+      '{line-height:var(--dshct-lh-box,1.5)}' +
+      /**
        * A callout is the same bargain as a table row: a box whose whole job is to
        * hold two lines of text. GenUI gives it `padding: 12px 15px` top and bottom
        * of a 60px box that carries 35px of content, so a third of its height is
