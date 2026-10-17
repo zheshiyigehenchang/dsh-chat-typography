@@ -455,6 +455,32 @@ window.__ModuleLoader__.load({
       '[data-chat-flow][data-chat-flow] [class*="_kvValue"]' +
       '{line-height:var(--dshct-lh-box,1.5)}' +
       /**
+       * The rest of the surface GenUI draws: a list item, a step, a timeline
+       * entry. Each is a run of text wrapped in a fixed padding that was sized
+       * for a 12.5–13.5px label and kept after the font-size layer flattened
+       * every label in the flow to the body size. A `li` at `9px 16px 9px`
+       * around a 16px line is 34px for one line of text.
+       *
+       * Zero, for the same reason as a table row, and only the vertical half.
+       * Every one of these already separates itself from its neighbours — a
+       * `li + li` border, a rail, a marker — so the padding was never what made
+       * two entries read apart.
+       */
+      '[data-chat-flow][data-chat-flow] [class*="_li"]' +
+      '{padding-top:0;padding-bottom:0}' +
+      '[data-chat-flow][data-chat-flow] [class*="_stepContent"]' +
+      '{padding-top:0}' +
+      '[data-chat-flow][data-chat-flow] [class*="_tlBody"]' +
+      '{padding-bottom:0}' +
+      /**
+       * The bullet is absolutely positioned at a fixed `top: 15px`, chosen
+       * against the 9px of padding above it. With that gone the dot would hang
+       * below the baseline of the line it belongs to, so it moves with the
+       * padding — 15px less 9px is 6px, and 5px is the length of the pad itself.
+       */
+      '[data-chat-flow][data-chat-flow] [class*="_li"]:before' +
+      '{top:6px}' +
+      /**
        * A callout is the same bargain as a table row: a box whose whole job is to
        * hold two lines of text. GenUI gives it `padding: 12px 15px` top and bottom
        * of a 60px box that carries 35px of content, so a third of its height is
