@@ -24,6 +24,9 @@
     "url": "https://github.com/zheshiyigehenchang/dsh-chat-typography/issues"
   },
   "icon": "icon.svg",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "index.js",
   "exports": {
     ".": "./index.js",
