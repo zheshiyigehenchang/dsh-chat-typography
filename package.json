@@ -1,6 +1,6 @@
 {
   "name": "@zheshiyigehenchang/dsh-chat-typography",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "设置DSH Harness对话流字体、字号行间距，以及对话文字到窗口边缘的留白。",
   "keywords": [
     "dsh",

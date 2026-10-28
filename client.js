@@ -327,6 +327,13 @@ window.__ModuleLoader__.load({
       '.dshct-unit{min-width:20px;color:var(--dsw-alias-label-tertiary);font-size:13px;line-height:22px}',
       '.dshct-input{box-sizing:border-box;width:210px;height:36px;padding:0 10px;border-radius:var(--dsw-radius-md);border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13px}',
       '.dshct-input.dshct-number{width:96px;font-variant-numeric:tabular-nums}',
+      /*
+       * 字体栈长得像 `"Consolas", "Microsoft YaHei"`，210px 装不下第三行就看不见了。
+       * 这三个框改成吃掉行里的空余宽度：两个子项各占一半，再由 440px / 52% 封顶，
+       * 所以窄面板下只压到一半宽，不会把左侧说明挤没；数字框仍是固定 96px。
+       */
+      '.dshct-row:has(.dshct-family) .dshct-control{flex:1 1 0;min-width:0;max-width:min(440px,52%)}',
+      '.dshct-input.dshct-family{width:100%;min-width:0}',
       '.dshct-input:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:1px}',
       '.dshct-button{height:36px;padding:0 16px;border-radius:var(--dsw-radius-md);border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font-family:inherit;font-size:14px;cursor:pointer}',
       '.dshct-button:hover{background:var(--dsw-alias-interactive-bg-hover)}',
@@ -813,7 +820,7 @@ window.__ModuleLoader__.load({
                 h('input', {
                   /* Keyed by the reset counter so a reset remounts the field. */
                   key: `${role}:${snapshot.resetVersion}`,
-                  className: 'dshct-input',
+                  className: 'dshct-input dshct-family',
                   type: 'text',
                   defaultValue: snapshot.fontFamilies[role] ?? '',
                   placeholder: t('familyPlaceholder'),
