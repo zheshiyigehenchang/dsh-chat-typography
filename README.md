@@ -47,6 +47,12 @@
 
 markdown 正文自己带着 `font` 简写（里面点名了 `var(--dsw-font-family)`），只在对话流根上写规则够不到它，所以选择器另外点名了 markdown 容器和推理行的 compact 变体。
 
+### 设置页的图标：自己画，不用宿主的齿轮
+
+宿主的设置导航**按 id 发图标**：`navIcon(id)` 只认 `account`、`models`、`agent-presets`、`plugins`、`archived-sessions` 五个内置 id，其余一律退回「设置」齿轮——于是「对话流排版」和「通用设置」顶着同一个齿轮。插件没法直接要到图标：`settings.section` 注册只收 `id` / `order` / `label`，而且 section 的 id 不进 DOM（导航行就是一个裸 `<button>` 加一个标签 `<span>`）；改用某个内置 id 等于把那页换掉。
+
+所以本插件按**自己的标题文字**认出那一行（标题由本页字典提供，且要求行内确实有图标，不会误伤别的按钮），给它打上 `data-dshct-nav`，再由样式表把宿主的齿轮 `display:none` 掉、在同一格里用 `mask` 画出自己的三行文字图形。只加属性、不替换节点，React 重新渲染也不会打架；颜色走 `currentColor`，悬停与选中态跟着整行走。宿主 DOM 将来若改了，这个标记就不会落下——那一行保留齿轮，功能不受影响。
+
 ### 行距与间距：所有纵向间隔只走一条网格
 
 这是本插件最花力气的部分。宿主的纵向间距来自三处互不相干的地方：
@@ -148,6 +154,7 @@ dsh-chat-typography/
 | 表格单元格收紧 | `[data-chat-flow]` 内 markdown 表格 | 常驻 |
 | 代码卡片内部收紧 | `[data-chat-flow]` 内代码块的 `<pre>` 上下内边距 | 常驻 |
 | 标题栏收紧 | `header.wSkVaW_header`（无标签行时） | 常驻 |
+| 设置页导航图标 | 设置对话框 `nav` 里本插件那一行（按标题文字认，打了 `data-dshct-nav`） | 常驻 |
 | 左右留白 | `:has([data-chat-flow])` 上的 `--dsh-chat-content-width` | 仅在填了数值时 |
 
 后面这几层（行内代码、表格、代码卡片、标题栏）是**固定的紧凑化**，不提供开关，也不随任何设置变化。其共同做法是靠提高选择器特异性取胜（重复属性选择器 `[data-chat-flow][data-chat-flow]`、重复类名 `header.wSkVaW_header.wSkVaW_header`），**不使用 `!important`** —— 因为被覆盖的宿主规则本身都不是 `!important`。
@@ -160,6 +167,7 @@ dsh-chat-typography/
 
 - **强依赖宿主内部实现**：`[data-chat-flow]` 钩子，`--dsh-chat-flow-gap`、`--dsh-chat-content-width`、`--dsl-terminal-line-height` 变量，以及 `[class*="_markdown_"]` 这类 CSS Modules 类名半段。宿主大版本升级（尤其是 `dsh-client-ui-chat` 与 `dsh-client-ui-primitives`）可能让某一层失效。类名用的是 localName 半段而不是哈希，跨构建稳定；变量名一旦改了就要跟着改。
 - **改动全在浏览器侧**，生效方式是刷新页面。
+- 设置页的导航图标是**运行时认行改画**：宿主把 dialog 挂到 `document.body`、并给面板留了 `data-shortcut-modal="settings"` 与 `<nav>`，本插件据此定位。这两点若变，标记不再落下，图标退回宿主的齿轮，其余功能照常。
 - 单行的控件行（时间戳、复制/重试按钮行、工具卡标题行）高度由按钮决定，不随行距伸缩。
 - 展开状态的步骤进程标题自带 `padding-bottom: 8px`，是固定值，也不随倍率走。
 - 字体族的写入依赖主题服务暴露 `setFontFamily`；万一没有，字体分组会自动隐藏，其余功能不受影响。

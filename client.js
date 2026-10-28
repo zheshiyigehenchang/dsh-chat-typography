@@ -29,6 +29,7 @@ window.__ModuleLoader__.load({
     const TIGHT_CODE_CARD_STYLE_ID = `${PKG}/tight-code-card`;
     const TIGHT_HEADER_STYLE_ID = `${PKG}/tight-header`;
     const ENCLOSED_STYLE_ID = `${PKG}/enclosed-symbols`;
+    const NAV_STYLE_ID = `${PKG}/settings-nav-icon`;
 
     /** Independently configurable font roles, matching the Appearance section. */
     const ROLES = ['text', 'code', 'terminal'];
@@ -660,6 +661,55 @@ window.__ModuleLoader__.load({
       if (tag !== null && tag.parentNode !== null) tag.parentNode.removeChild(tag);
     }
 
+    /**
+     * Give this section its own glyph in the Settings nav.
+     *
+     * The Settings shell picks the nav glyph itself: `navIcon(id)` in
+     * dsh-client-ui-settings-general maps five built-in ids to their icons and
+     * returns the settings gear for everything else, so this section and 通用设置
+     * were drawing the same gear. A plugin cannot ask for an icon — the
+     * `settings.section` registration accepts only `id`, `order` and `label`, and
+     * the section id never reaches the DOM (the row is a bare `<button>` with a
+     * label span). Reusing a built-in id is not an option either: it would replace
+     * that section.
+     *
+     * So the row is found by the one thing it does carry: our label text, which
+     * comes straight from the dictionaries below. The match requires a nav button
+     * with an icon and that exact text, so an unrelated button cannot be hit, and
+     * the row is marked rather than rebuilt — the sheet then hides the gear and
+     * paints our glyph in the same 16px flex slot via a mask, which keeps the
+     * row's colour for hover and active states. Nothing is replaced, so React
+     * never fights it, and if the shell's markup ever changes the mark simply
+     * never lands: the row keeps its gear and still works.
+     *
+     * The observer watches only `document.body`'s direct children, because the
+     * dialog is portalled there — that fires when the panel opens or closes and
+     * never during chat streaming, which mutates the transcript instead.
+     */
+    const NAV_ATTR = 'data-dshct-nav';
+    const NAV_GLYPH =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" ' +
+      'stroke="#000" stroke-width="1.3" stroke-linecap="round"><path d="M2.6 4.6h10.8"/>' +
+      '<path d="M2.6 8h10.8"/><path d="M2.6 11.4h6.6"/></svg>';
+    const NAV_MASK = `url("data:image/svg+xml,${encodeURIComponent(NAV_GLYPH)}")`;
+    const NAV_CSS =
+      `[${NAV_ATTR}]>svg{display:none}` +
+      `[${NAV_ATTR}]::before{content:"";flex:none;width:16px;height:16px;background-color:currentColor;` +
+      `mask:${NAV_MASK} center/16px no-repeat;-webkit-mask:${NAV_MASK} center/16px no-repeat}`;
+
+    /** Mark this section's own nav row, if the panel is on screen. */
+    function markNavRow(labels) {
+      const rows = document.querySelectorAll(
+        '[data-shortcut-modal="settings"] nav button,[role="dialog"] nav button',
+      );
+      for (const row of rows) {
+        if (row.hasAttribute(NAV_ATTR)) continue;
+        if (row.querySelector('svg') === null) continue;
+        if (!labels.has((row.textContent ?? '').trim())) continue;
+        row.setAttribute(NAV_ATTR, '');
+      }
+    }
+
     /** One labelled preference row. */
     function Row({ title, desc, children }) {
       return h(
@@ -995,6 +1045,23 @@ window.__ModuleLoader__.load({
           const tag = mountStyle(ENCLOSED_STYLE_ID, ENCLOSED_CSS);
           return () => unmountStyle(tag);
         }, 'chat-typography: enclosed symbols');
+
+        ctx.effect(() => {
+          const tag = mountStyle(NAV_STYLE_ID, NAV_CSS);
+          const labels = new Set([zh.nav, en.nav]);
+          markNavRow(labels);
+          const body = document.body;
+          if (body === null) return () => unmountStyle(tag);
+          const observer = new MutationObserver(() => markNavRow(labels));
+          observer.observe(body, { childList: true });
+          return () => {
+            observer.disconnect();
+            unmountStyle(tag);
+            for (const row of document.querySelectorAll(`[${NAV_ATTR}]`)) {
+              row.removeAttribute(NAV_ATTR);
+            }
+          };
+        }, 'chat-typography: settings nav glyph');
 
         ctx.effect(() => {
           tableTag = mountStyle(TIGHT_TABLE_STYLE_ID, TIGHT_TABLE_CSS);
