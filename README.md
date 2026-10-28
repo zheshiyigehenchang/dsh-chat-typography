@@ -1,6 +1,6 @@
 # 对话流排版 · dsh-chat-typography
 
-给 DSH Harness 的对话流加一页排版设置：**一个字号管住全文、一条网格管住所有纵向间距、三种角色各自的字体，以及对话文字到窗口边缘的留白**；此外还固定收紧了几处宿主留白（标题栏、代码块内边距、表格单元格、行内代码药丸底色）。
+给 DSH Harness 的对话流加一页排版设置：**一个字号管住全文、一条网格管住所有纵向间距、三种角色各自的字体，以及对话文字到窗口边缘的留白**；此外还固定收紧了几处宿主留白（标题栏、代码块内边距、表格单元格、行内代码药丸底色），并让 `③` 这类圈码跟着中文字体走，不再被等宽字体的 0.55em 字形缩小。
 
 装好后「设置」里会多出一页 **对话流排版**。
 
@@ -27,6 +27,25 @@
 ### 字体：文字 / 代码 / 终端 三种角色
 
 三个输入框分别设置 `text` / `code` / `terminal` 的字体族，留空即系统默认。写入走 Harness 的主题服务，所以**和「外观」页共用同一份设置** —— 在这一页改，外观页同步显示；在外观页改，这里也会跟着变。输入不需要自己加引号，服务会做清洗和补引号。
+
+### 圈码：③ 跟中文字体走，不跟等宽字体走
+
+宿主允许把正文设成 `"Consolas", "Microsoft YaHei"` 这种混排栈。Consolas 没有汉字，汉字就落到雅黑；但 `③`（U+2462）**在 Consolas 里是有的**，于是它按 Consolas 的设计画出来：0.55em 的小圈，还比汉字基线高出 6px。同一行里因此出现两种大小、两条基线——这是**同一个 `font-size`、不同字体**，任何字号规则都改不回来（实测：Consolas 22px 的 ③ 是 12×12，雅黑 22px 的 ③ 是 21×21）。
+
+修法是让这一块字符改投中文字体，而不是动字号：
+
+```css
+@font-face {
+  font-family: "dshct-enclosed";
+  src: local("PingFang SC"), local("Hiragino Sans GB"), local("Microsoft YaHei"), …;
+  unicode-range: U+2460-24FF, U+3251-325F, U+32B1-32BF;  /* ①–⓿、㉑–㉟、㊱–㊿ */
+}
+[data-chat-flow][data-chat-flow] { font-family: "dshct-enclosed", var(--dsw-font-family) }
+```
+
+`unicode-range` 把这层限定在圈码上，其余字符原样落回 `var(--dsw-font-family)`——宿主自己的值——所以**拉丁正文和代码块的字体一处都没变**，只有圈码恢复成 1em 的汉字尺寸、坐回汉字基线。系统里一个中文字体都找不到时，这个 `@font-face` 没有可用源，浏览器直接忽略，等于没装。
+
+markdown 正文自己带着 `font` 简写（里面点名了 `var(--dsw-font-family)`），只在对话流根上写规则够不到它，所以选择器另外点名了 markdown 容器和推理行的 compact 变体。
 
 ### 行距与间距：所有纵向间隔只走一条网格
 
@@ -125,6 +144,7 @@ dsh-chat-typography/
 | 统一字号 | `[data-chat-flow]` 内除输入控件与图标 | 常驻 |
 | 行距与间距 | `[data-chat-flow]`，内容随倍率重写 | 常驻（倍率 1.00 也写） |
 | 行内代码去底色 | `[data-chat-flow]` 内 markdown 的 `:not(pre)>code` 与文件提及 | 常驻 |
+| 圈码改投中文字体 | `[data-chat-flow]` 及其 markdown 正文里的 `U+2460-24FF` 等圈码 | 常驻 |
 | 表格单元格收紧 | `[data-chat-flow]` 内 markdown 表格 | 常驻 |
 | 代码卡片内部收紧 | `[data-chat-flow]` 内代码块的 `<pre>` 上下内边距 | 常驻 |
 | 标题栏收紧 | `header.wSkVaW_header`（无标签行时） | 常驻 |

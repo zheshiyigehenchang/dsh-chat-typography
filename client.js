@@ -28,6 +28,7 @@ window.__ModuleLoader__.load({
     const TIGHT_TABLE_STYLE_ID = `${PKG}/tight-table`;
     const TIGHT_CODE_CARD_STYLE_ID = `${PKG}/tight-code-card`;
     const TIGHT_HEADER_STYLE_ID = `${PKG}/tight-header`;
+    const ENCLOSED_STYLE_ID = `${PKG}/enclosed-symbols`;
 
     /** Independently configurable font roles, matching the Appearance section. */
     const ROLES = ['text', 'code', 'terminal'];
@@ -346,6 +347,43 @@ window.__ModuleLoader__.load({
     const FLAT_SIZE_CSS =
       '[data-chat-flow][data-chat-flow] *:not(textarea):not(input):not(svg):not(svg *)' +
       '{font-size:var(--dsh-content-font-size,14px)!important}';
+
+    /**
+     * Enclosed symbols take the CJK text font instead of whatever Latin face
+     * claims them first.
+     *
+     * ③ is U+2462. In a full-width CJK face it is a 1em ring on the ideographic
+     * baseline, exactly as tall as the hanzi beside it. In a Latin-metric mono it
+     * is a 0.55em ring lifted above the baseline: Consolas draws it 12x12 next to
+     * a 22px hanzi, and that is what a mixed `"Consolas", "Microsoft YaHei"` stack
+     * produces — hanzi fall through to YaHei, but the circled digit hits Consolas
+     * first, so one line carries two sizes and two baselines. No size rule can fix
+     * that, because both runs already share one font-size.
+     *
+     * So this declares a face sourced only from the usual CJK text families and
+     * points it at the enclosed-symbol blocks alone, then prepends it to the
+     * family list. Every other character falls straight through to
+     * `var(--dsw-font-family)` — the Host's own value — so Latin prose keeps the
+     * chosen face. The three selectors are the three places inside the flow that
+     * carry a family of their own: the column itself, the markdown body (its
+     * `font` shorthand names `var(--dsw-font-family)` outright, so a rule on the
+     * column would never reach the prose), and the compact reasoning variant.
+     * `pre` and `code` are left out on purpose — the Host gives them the code
+     * family directly and this layer has no business changing it. Where no CJK
+     * family exists the face has no usable source, the browser drops it, and the
+     * layer costs nothing.
+     */
+    const ENCLOSED_FAMILY = 'dshct-enclosed';
+    const ENCLOSED_CSS =
+      '@font-face{font-family:"' + ENCLOSED_FAMILY + '";' +
+      'src:local("PingFang SC"),local("Hiragino Sans GB"),local("Microsoft YaHei"),' +
+      'local("Microsoft YaHei UI"),local("Noto Sans CJK SC"),local("Noto Sans SC"),' +
+      'local("Source Han Sans SC"),local("SimHei"),local("WenQuanYi Micro Hei");' +
+      'unicode-range:U+2460-24FF,U+3251-325F,U+32B1-32BF}' +
+      '[data-chat-flow][data-chat-flow],' +
+      '[data-chat-flow][data-chat-flow] [class*="_markdown_"],' +
+      '[data-chat-flow][data-chat-flow] [data-markdown-variant="compact"]' +
+      '{font-family:"' + ENCLOSED_FAMILY + '",var(--dsw-font-family)}';
 
     /**
      * Inline code as plain monospace text, with no chip of its own.
@@ -952,6 +990,11 @@ window.__ModuleLoader__.load({
           const tag = mountStyle(BARE_CODE_STYLE_ID, BARE_CODE_CSS);
           return () => unmountStyle(tag);
         }, 'chat-typography: bare inline code');
+
+        ctx.effect(() => {
+          const tag = mountStyle(ENCLOSED_STYLE_ID, ENCLOSED_CSS);
+          return () => unmountStyle(tag);
+        }, 'chat-typography: enclosed symbols');
 
         ctx.effect(() => {
           tableTag = mountStyle(TIGHT_TABLE_STYLE_ID, TIGHT_TABLE_CSS);
