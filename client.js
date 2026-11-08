@@ -13,7 +13,7 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react');
     const h = React.createElement;
-    const { useSyncExternalStore } = React;
+    const { useSyncExternalStore, useState, useEffect } = React;
 
     /** Package id: the module-table key and the owner of every style tag below. */
     const PKG = '@zheshiyigehenchang/dsh-chat-typography';
@@ -29,7 +29,8 @@ window.__ModuleLoader__.load({
     const TIGHT_CODE_CARD_STYLE_ID = `${PKG}/tight-code-card`;
     const TIGHT_HEADER_STYLE_ID = `${PKG}/tight-header`;
     const ENCLOSED_STYLE_ID = `${PKG}/enclosed-symbols`;
-    const NAV_STYLE_ID = `${PKG}/settings-nav-icon`;
+    const HIDE_TABS_STYLE_ID = `${PKG}/hide-view-tabs`;
+    const COMPACT_HEADER_STYLE_ID = `${PKG}/compact-header`;
 
     /** Independently configurable font roles, matching the Appearance section. */
     const ROLES = ['text', 'code', 'terminal'];
@@ -51,6 +52,14 @@ window.__ModuleLoader__.load({
     /** Side-gutter bounds, in pixels. */
     const GUTTER_MIN = 0;
     const GUTTER_MAX = 600;
+    /** localStorage key: `'1'` hides the conversation View tab row. */
+    const HIDE_TABS_KEY = 'dsh-chat-typography.hideViewTabs';
+    /** Root attribute the hide-tabs sheet keys off, so the CSS can stay static. */
+    const HIDE_TABS_ATTR = 'data-dshct-hide-view-tabs';
+    /** localStorage key: `'1'` removes the conversation header's block padding. */
+    const COMPACT_HEADER_KEY = 'dsh-chat-typography.compactHeader';
+    /** Root attribute the compact-header sheet keys off. */
+    const COMPACT_HEADER_ATTR = 'data-dshct-compact-header';
 
     const zh = {
       nav: '对话流排版',
@@ -75,6 +84,30 @@ window.__ModuleLoader__.load({
       gutterDesc:
       '文字距窗口左右边缘的距离（px）。留空则用宿主默认宽度；宿主已为输入框两侧控件预留约 32px，所以填 0 也不会低于这个值。设置后宽度由它决定，拖动宽度手柄不再生效。',
       gutterPlaceholder: '自动',
+      hideTabsTitle: '隐藏视图标签栏',
+      hideTabsDesc:
+        '隐藏标题栏下方「对话 / 轨迹 / …」这一行，让标题栏只剩一行。注意：标签栏是切换「轨迹」等其它视图的唯一入口，隐藏后无法在界面里切换；需要时回到这里重新打开。',
+      compactHeaderTitle: '紧凑会话标题栏',
+      compactHeaderDesc:
+        '把会话标题栏上下的 5px 留白归零：单行标题栏从约 41px 压到约 31px，字号和「标准模式」胶囊都不缩小。标签栏可见时宿主仍保留 76px 下限，这一项主要作用于单行标题栏。',
+      titlebarTitle: '桌面标题栏',
+      titlebarDesc:
+        '把官方桌面版最上面一行（文件 / 视图 / 运行 / 帮助与窗口按钮）压到 28px。写入的是安装目录里的 app.asar，需要完全退出并重启 DSH 才生效；应用更新后会恢复原值，再点一次即可。如果它已经被改过，这里会直接告诉你状态，不必再点。',
+      titlebarAction: '写入 28px',
+      titlebarBusy: '写入中…',
+      titlebarReading: '正在读取桌面版的 app.asar…',
+      titlebarCurrent: (height) =>
+        `桌面版现在读取的标题栏高度是 ${height}px：点上面的按钮写入 28px，重启后生效。`,
+      titlebarAlready: '已经是 28px，无需修改。',
+      titlebarPatched: '已写入 28px：请完全退出 DSH 再启动。',
+      titlebarPendingRestart: 'app.asar 已经是 28px：完全退出 DSH 再启动后生效。',
+      titlebarWillNeedExit: '写入前要完全退出 DSH（包括对话框开着也没关系，先退出桌面版），写入后再启动它。',
+      titlebarNoWrite: '读得到 app.asar，但现在不能写：先完全退出桌面版（这一页会自动重连），再回来点一次，或直接用 scripts/patch-desktop-titlebar.mjs。',
+      titlebarNotDesktop:
+        '没找到当前桌面版的 app.asar：只有官方桌面版能改写标题栏，浏览器里的 Harness 不适用。若你确实在用桌面版，请重启一次 DSH 再试。',
+      titlebarNoMarker: '这个 app.asar 里的标题栏高度写法不认识，未做修改（可用 scripts/patch-desktop-titlebar.mjs 手动处理）。',
+      titlebarNoAccess: '找到了 app.asar 但读写失败（可能权限不足），未做修改。',
+      titlebarFailed: '写入失败，请稍后再试。',
       reset: '恢复默认',
       resetDesc: '字号、字体与间距都回到默认值。',
       resetAction: '重置',
@@ -102,6 +135,31 @@ window.__ModuleLoader__.load({
       gutterDesc:
       'Distance in px from the conversation text to the left and right window edges. Empty keeps the host width; the host already reserves about 32px for the composer controls, so 0 cannot go below that. While set, this value owns the width and the drag handle no longer changes it.',
       gutterPlaceholder: 'Auto',
+      hideTabsTitle: 'Hide the view tab row',
+      hideTabsDesc:
+        'Hides the “Chat / Trajectory / …” row under the header so the header keeps a single line. Note: the tab row is the only way to switch to other views such as Trajectory, so hiding it leaves no in-app switcher; turn it back on here when needed.',
+      compactHeaderTitle: 'Compact conversation header',
+      compactHeaderDesc:
+        'Zeroes the 5px padding above and below the conversation header, taking the single-line header from about 41px to about 31px. Font size and the “Standard mode” pill stay as they are. While the tab row is visible the host still floors the header at 76px, so this mainly affects the single-line header.',
+      titlebarTitle: 'Desktop title bar',
+      titlebarDesc:
+        'Shrinks the official desktop app’s top row (File / View / Run / Help and the window buttons) to 28px. It writes inside app.asar in the install directory, so DSH must be fully quit and started again; app updates restore the original value, and one more click reapplies it. If it has already been changed, the row says so instead of making you click.',
+      titlebarAction: 'Write 28px',
+      titlebarBusy: 'Writing…',
+      titlebarReading: 'Reading the desktop app’s app.asar…',
+      titlebarCurrent: (height) =>
+        `The desktop app currently reads a ${height}px title bar: press the button above to write 28px, then restart.`,
+      titlebarAlready: 'Already 28px — nothing to do.',
+      titlebarPatched: 'Wrote 28px: fully quit and start DSH again.',
+      titlebarPendingRestart: 'app.asar is already 28px: fully quit and start DSH to see it.',
+      titlebarWillNeedExit: 'Writing needs DSH fully quit (closing the desktop app is enough); start it again afterwards.',
+      titlebarNoWrite:
+        'app.asar is readable but not writable right now: fully quit the desktop app (this page reconnects on its own), then come back and press the button once more, or use scripts/patch-desktop-titlebar.mjs.',
+      titlebarNotDesktop:
+        'Could not find the desktop app’s app.asar: only the official desktop app can be retuned here, a Harness page in a browser cannot. If you are in the desktop app, restart DSH and try again.',
+      titlebarNoMarker: 'The title bar height is written differently in this app.asar, so nothing was changed (scripts/patch-desktop-titlebar.mjs can do it by hand).',
+      titlebarNoAccess: 'Found app.asar but could not read or write it (permissions?), so nothing was changed.',
+      titlebarFailed: 'Writing failed. Please try again.',
       reset: 'Restore defaults',
       resetDesc: 'Reset font size, font family, and spacing.',
       resetAction: 'Reset',
@@ -163,6 +221,48 @@ window.__ModuleLoader__.load({
       try {
         if (value === null) localStorage.removeItem(GUTTER_KEY);
         else localStorage.setItem(GUTTER_KEY, String(value));
+      } catch (_storageUnavailable) {
+        /* The value still applies for this page session. */
+      }
+    }
+
+    /** Read the stored hide-tabs flag; anything but `'1'` leaves the row visible. */
+    function readHideTabs() {
+      if (typeof localStorage === 'undefined') return false;
+      try {
+        return localStorage.getItem(HIDE_TABS_KEY) === '1';
+      } catch (_storageUnavailable) {
+        return false;
+      }
+    }
+
+    /** Persist the hide-tabs flag, dropping the key again when it is off. */
+    function writeHideTabs(value) {
+      if (typeof localStorage === 'undefined') return;
+      try {
+        if (value) localStorage.setItem(HIDE_TABS_KEY, '1');
+        else localStorage.removeItem(HIDE_TABS_KEY);
+      } catch (_storageUnavailable) {
+        /* The value still applies for this page session. */
+      }
+    }
+
+    /** Read the stored compact-header flag; anything but `'1'` keeps the padding. */
+    function readCompactHeader() {
+      if (typeof localStorage === 'undefined') return false;
+      try {
+        return localStorage.getItem(COMPACT_HEADER_KEY) === '1';
+      } catch (_storageUnavailable) {
+        return false;
+      }
+    }
+
+    /** Persist the compact-header flag, dropping the key again when it is off. */
+    function writeCompactHeader(value) {
+      if (typeof localStorage === 'undefined') return;
+      try {
+        if (value) localStorage.setItem(COMPACT_HEADER_KEY, '1');
+        else localStorage.removeItem(COMPACT_HEADER_KEY);
       } catch (_storageUnavailable) {
         /* The value still applies for this page session. */
       }
@@ -338,6 +438,11 @@ window.__ModuleLoader__.load({
       '.dshct-button{height:36px;padding:0 16px;border-radius:var(--dsw-radius-md);border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font-family:inherit;font-size:14px;cursor:pointer}',
       '.dshct-button:hover{background:var(--dsw-alias-interactive-bg-hover)}',
       '.dshct-button:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:1px}',
+      '.dshct-button:disabled{opacity:.55;cursor:default}',
+      '.dshct-titlebar{display:flex;flex-direction:column;align-items:flex-end;gap:6px}',
+      '.dshct-titlebarStatus{max-width:260px;text-align:right;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}',
+      '.dshct-checkbox{width:18px;height:18px;margin:0;cursor:pointer;accent-color:var(--dsw-alias-brand-primary)}',
+      '.dshct-checkbox:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:2px}',
     ].join('');
 
     /**
@@ -479,6 +584,16 @@ window.__ModuleLoader__.load({
       '{padding-left:0}' +
       '[data-chat-flow][data-chat-flow] [class*="_tableScroll_"] td:last-child' +
       '{padding-right:0}' +
+      /**
+       * The scroll box clips at its padding box, and the host zeroes the first
+       * cell's left padding so a table lines up with the prose above it. A file
+       * link's leading icon then sits exactly on that clip edge, and the outer
+       * antialiased column of its leftmost stroke is shaved off — the `<` looks
+       * half cut. Padding the box and pulling it back by the same amount leaves
+       * the table where it was but moves the clip edge two pixels to the left.
+       */
+      '[data-chat-flow][data-chat-flow] [class*="_tableScroll_"]' +
+      '{padding-left:2px;margin-left:-2px}' +
       '[data-chat-flow][data-chat-flow] [class*="_table"] :is(th,td)' +
       '{padding-top:0;padding-bottom:0}' +
       /* The cell's line box, put back on the conversation's own rhythm: GenUI
@@ -647,8 +762,75 @@ window.__ModuleLoader__.load({
      * land in, and no `!important` is needed because the host's are not `!important`.
      */
     const TIGHT_HEADER_CSS =
-      'header.wSkVaW_header.wSkVaW_header:not(:has(.wSkVaW_tabs))' +
+      'header.wSkVaW_header.wSkVaW_header:not(:has(.wSkVaW_tabs)),' +
+      /**
+       * Build-independent fallback. The host's CSS-Modules hash changes between
+       * releases (`wSkVaW` in rc.4, `an3WzG` in the official rc.5), but the
+       * `data-conversation-tabs` attribute on the tab list does not, and the
+       * header always carries a `*_titleRow` localName. While tabs exist the
+       * guard keeps the host's 76px floor; without them this tightens the bar.
+       */
+      'header:has([class*="_titleRow"]):not(:has([data-conversation-tabs]))' +
       '{padding-top:5px;padding-bottom:5px}';
+
+    /**
+     * Optional: drop the View tab row entirely.
+     *
+     * The host renders a second header row (`div.wSkVaW_tabs`) only while at least
+     * two Views are registered, and floors the header at 76px for exactly that
+     * case (`:has(.wSkVaW_tabs)`). Hiding the row therefore takes two declarations
+     * together: the row itself, and the geometry the host would have used had the
+     * row never existed — `min-height: 0` plus the tighter 5px padding this bundle
+     * already applies to a tab-less header, so the result is the same 41px bar.
+     *
+     * It is gated on `html[data-dshct-hide-view-tabs]` rather than baked in because
+     * the tab row is the only in-app entry point to the other Views (Trajectory):
+     * switching it on is a user's choice, not a default. The attribute is owned by
+     * the settings page; the sheet itself never changes, so nothing is rebuilt when
+     * the toggle flips.
+     */
+    const HIDE_TABS_CSS =
+      `html[${HIDE_TABS_ATTR}] header.wSkVaW_header .wSkVaW_tabs{display:none}` +
+      /**
+       * The row is the element whose direct child carries the stable
+       * `data-conversation-tabs` attribute; the header is any `<header>` holding
+       * it. Both rules are hash-agnostic, so rc.4 (`wSkVaW`) and rc.5 (`an3WzG`)
+       * behave the same.
+       */
+      `html[${HIDE_TABS_ATTR}] header :has(> [data-conversation-tabs]){display:none}` +
+      `html[${HIDE_TABS_ATTR}] header:has([data-conversation-tabs])` +
+      '{min-height:0;padding-top:5px;padding-bottom:5px}' +
+      `html[${HIDE_TABS_ATTR}] header.wSkVaW_header.wSkVaW_header` +
+      '{min-height:0;padding-top:5px;padding-bottom:5px}';
+
+    /**
+     * Optional: squeeze the conversation header down to its content.
+     *
+     * The 5px block padding above is pure breathing room; the comment above the
+     * tight-header sheet records the measured sweep — 5px→41, 3px→37, 0→31 — so
+     * zeroing it recovers 10px without touching any child's own box. That matters
+     * here: the title's font size and the “standard mode” pill are deliberately
+     * left alone, so the bar gets shorter, not smaller.
+     *
+     * The triple class is only about ordering. `HIDE_TABS_CSS` also declares the
+     * padding on a two-class selector, and both sheets are static; a third class
+     * keeps this one winning whatever order the tags land in, and still loses no
+     * `!important` arms race with the host.
+     *
+     * `min-height` is not in this sheet on purpose: with the tab row visible the
+     * host floors the header at 76px, and that floor is what keeps the strip from
+     * colliding with the content. Here the padding simply tightens; the floor
+     * still holds.
+     */
+    const COMPACT_HEADER_CSS =
+      `html[${COMPACT_HEADER_ATTR}] header.wSkVaW_header.wSkVaW_header.wSkVaW_header` +
+      '{padding-top:0;padding-bottom:0}' +
+      /**
+       * Same rule for builds whose hash is not `wSkVaW`; the doubled `:has()`
+       * keeps it above `HIDE_TABS_CSS`'s padding whatever order the tags land in.
+       */
+      `html[${COMPACT_HEADER_ATTR}] header:has([data-conversation-tabs]):has([data-conversation-tabs])` +
+      '{padding-top:0;padding-bottom:0}';
 
     /** Create or reuse this bundle's own style tag for one sheet id. */
     function mountStyle(id, css) {
@@ -669,52 +851,73 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Give this section its own glyph in the Settings nav.
+     * Resolve one of this bundle's host routes against the page's own base.
      *
-     * The Settings shell picks the nav glyph itself: `navIcon(id)` in
-     * dsh-client-ui-settings-general maps five built-in ids to their icons and
-     * returns the settings gear for everything else, so this section and 通用设置
-     * were drawing the same gear. A plugin cannot ask for an icon — the
-     * `settings.section` registration accepts only `id`, `order` and `label`, and
-     * the section id never reaches the DOM (the row is a bare `<button>` with a
-     * label span). Reusing a built-in id is not an option either: it would replace
-     * that section.
-     *
-     * So the row is found by the one thing it does carry: our label text, which
-     * comes straight from the dictionaries below. The match requires a nav button
-     * with an icon and that exact text, so an unrelated button cannot be hit, and
-     * the row is marked rather than rebuilt — the sheet then hides the gear and
-     * paints our glyph in the same 16px flex slot via a mask, which keeps the
-     * row's colour for hover and active states. Nothing is replaced, so React
-     * never fights it, and if the shell's markup ever changes the mark simply
-     * never lands: the row keeps its gear and still works.
-     *
-     * The observer watches only `document.body`'s direct children, because the
-     * dialog is portalled there — that fires when the panel opens or closes and
-     * never during chat streaming, which mutates the transcript instead.
+     * The host UI anchors its API paths on `document.baseURI`; the desktop shell
+     * loads the SPA from a file-like origin, where a hard-coded `/` path is not
+     * necessarily reachable, while a base-relative path lands on the same route
+     * as in the browser GUI.
      */
-    const NAV_ATTR = 'data-dshct-nav';
-    const NAV_GLYPH =
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" ' +
-      'stroke="#000" stroke-width="1.3" stroke-linecap="round"><path d="M2.6 4.6h10.8"/>' +
-      '<path d="M2.6 8h10.8"/><path d="M2.6 11.4h6.6"/></svg>';
-    const NAV_MASK = `url("data:image/svg+xml,${encodeURIComponent(NAV_GLYPH)}")`;
-    const NAV_CSS =
-      `[${NAV_ATTR}]>svg{display:none}` +
-      `[${NAV_ATTR}]::before{content:"";flex:none;width:16px;height:16px;background-color:currentColor;` +
-      `mask:${NAV_MASK} center/16px no-repeat;-webkit-mask:${NAV_MASK} center/16px no-repeat}`;
-
-    /** Mark this section's own nav row, if the panel is on screen. */
-    function markNavRow(labels) {
-      const rows = document.querySelectorAll(
-        '[data-shortcut-modal="settings"] nav button,[role="dialog"] nav button',
-      );
-      for (const row of rows) {
-        if (row.hasAttribute(NAV_ATTR)) continue;
-        if (row.querySelector('svg') === null) continue;
-        if (!labels.has((row.textContent ?? '').trim())) continue;
-        row.setAttribute(NAV_ATTR, '');
+    function apiPath(path) {
+      const relative = String(path).replace(/^\/+/, '');
+      if (typeof document === 'undefined' || typeof document.baseURI !== 'string') return `/${relative}`;
+      try {
+        return new URL(relative, document.baseURI).pathname;
+      } catch (_noBase) {
+        return `/${relative}`;
       }
+    }
+
+    /**
+     * This section's glyph in the Settings nav.
+     *
+     * The shell draws a row's icon itself: `navIcon(id)` in
+     * dsh-client-ui-settings-general maps five built-in ids to their icons and
+     * falls back to the settings gear, so this section used to share the gear
+     * with the general section. The shell docks an extension seat for exactly
+     * this: `settings.section.icon` is a root list slot whose registrant
+     * id must equal the target `settings.section` id, rendered inside the row's
+     * icon span in place of the default glyph and receiving `{ size, active }`.
+     * Reusing a built-in id is not an option: it would replace that section.
+     *
+     * Earlier revisions instead marked the row in the DOM and swapped its glyph
+     * through a mask. That made TWO icons appear: the shell wraps its glyph in
+     * `<span class="navIcon">`, so a selector aimed at the button's direct
+     * children hid nothing while the injected pseudo-element took its own flex
+     * slot beside the gear. Nothing in this file touches that markup now.
+     */
+    /** The nav glyph's drawing box, in CSS pixels; the shell asks for 16. */
+    const NAV_GLYPH_SIZE = 16;
+    /**
+     * Slot seat for the nav glyph.
+     *
+     * The shell hands over `{ size, active }`; the drawing scales with `size`
+     * and the stroke keeps the row's own colour through `currentColor`, so the
+     * hover and active states paint themselves and the glyph never needs a
+     * stylesheet of its own.
+     * @param props - icon owner props supplied by the Settings shell.
+     * @returns the glyph, sized to the seat.
+     */
+    function NavGlyph({ size }) {
+      const box = typeof size === 'number' && size > 0 ? size : NAV_GLYPH_SIZE;
+      return h(
+        'svg',
+        {
+          xmlns: 'http://www.w3.org/2000/svg',
+          viewBox: '0 0 16 16',
+          width: box,
+          height: box,
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: 1.3,
+          strokeLinecap: 'round',
+          'aria-hidden': 'true',
+          focusable: 'false',
+        },
+        h('path', { d: 'M2.6 4.6h10.8' }),
+        h('path', { d: 'M2.6 8h10.8' }),
+        h('path', { d: 'M2.6 11.4h6.6' }),
+      );
     }
 
     /** One labelled preference row. */
@@ -738,7 +941,7 @@ window.__ModuleLoader__.load({
      * @returns the section component registered into `settings.section`.
      */
     function createSection(deps) {
-      const { ctx, t, store, setLineHeight, setGutter, reset, canWriteFamily } = deps;
+      const { ctx, t, store, setLineHeight, setGutter, setHideTabs, setCompactHeader, reset, canWriteFamily } = deps;
       const { subscribe, getSnapshot } = store;
       /** Clamp one typed size into the role's range and write it to the theme. */
       const setSize = (role, value) => {
@@ -748,8 +951,90 @@ window.__ModuleLoader__.load({
       const commitFamily = (role, value) => {
         ctx.theme.setFontFamily(role, value);
       };
+      /** The height the desktop app reads right now, 28, or null when unknown. */
+      const TARGET_TITLEBAR_HEIGHT = 28;
       return function ChatTypographySection() {
         const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+        const [titlebar, setTitlebar] = useState({ busy: false, message: '' });
+        /**
+         * The host half can only read `app.asar`, never write it, while the
+         * desktop app is running: the app holds the archive open without write
+         * sharing. Every write therefore happens from a *separate* `dsh web`
+         * host, and this page says so instead of offering a button that fails.
+         * null means "not asked yet"; `supported: false` means a browser page.
+         */
+        const [survey, setSurvey] = useState(null);
+        useEffect(() => {
+          let live = true;
+          fetch(apiPath('/chat-typography/api/windows-titlebar'), { headers: { accept: 'application/json' } })
+            .then((response) => response.json())
+            .then((data) => {
+              if (live && data && typeof data === 'object') setSurvey(data);
+            })
+            .catch(() => {
+              if (live) setSurvey({ ok: false, code: 'not-desktop' });
+            });
+          return () => {
+            live = false;
+          };
+        }, []);
+        const atTarget = survey?.ok === true && survey.height === TARGET_TITLEBAR_HEIGHT;
+        /** Write only where the archive is writable; otherwise explain what to do. */
+        const writeTitlebar = async () => {
+          if (titlebar.busy) return;
+          if (survey?.ok !== true) {
+            setTitlebar({ busy: false, message: survey ? t('titlebarNotDesktop') : t('titlebarWillNeedExit') });
+            return;
+          }
+          if (survey.writable !== true) {
+            setTitlebar({ busy: false, message: t('titlebarNoWrite') });
+            return;
+          }
+          setTitlebar({ busy: true, message: '' });
+          try {
+            const response = await fetch(apiPath('/chat-typography/api/windows-titlebar'), {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', 'x-dshct-action': 'titlebar' },
+              body: JSON.stringify({ height: TARGET_TITLEBAR_HEIGHT }),
+            });
+            const data = await response.json().catch(() => null);
+            if (response.ok && data?.ok) {
+              setSurvey({ ok: true, height: TARGET_TITLEBAR_HEIGHT, writable: survey.writable });
+              setTitlebar({ busy: false, message: data.already ? t('titlebarAlready') : t('titlebarPatched') });
+              return;
+            }
+            const code = data?.code;
+            const message =
+              code === 'not-desktop'
+                ? t('titlebarNotDesktop')
+                : code === 'no-marker' || code === 'digit-count' || code === 'offset-drift'
+                  ? t('titlebarNoMarker')
+                  : code === 'io' || code === 'unreadable'
+                    ? t('titlebarNoAccess')
+                    : t('titlebarFailed');
+            setTitlebar({ busy: false, message });
+          } catch (_unreachable) {
+            setTitlebar({ busy: false, message: t('titlebarFailed') });
+          }
+        };
+        /**
+         * One line under the button, describing what is true now: the stored
+         * height, whether it still needs a restart, or why the write cannot
+         * happen from this very page.
+         */
+        const titlebarStatus = () => {
+          if (titlebar.message !== '') return titlebar.message;
+          if (survey === null) return t('titlebarReading');
+          if (!survey.ok) {
+            return survey.code === 'no-marker' || survey.code === 'unreadable'
+              ? t('titlebarNoMarker')
+              : t('titlebarNotDesktop');
+          }
+          if (atTarget) return t('titlebarPendingRestart');
+          if (survey.writable === true) return t('titlebarCurrent')(survey.height);
+          return t('titlebarNoWrite');
+        };
+        const titlebarDisabled = titlebar.busy || survey === null || survey.ok !== true || survey.writable !== true || atTarget;
         /** Read a number field, or put the field back when it holds no number. */
         const readNumber = (input, shown) => {
           const raw = input.value.trim();
@@ -883,6 +1168,47 @@ window.__ModuleLoader__.load({
             }),
             h('span', { className: 'dshct-unit' }, 'px'),
           ),
+          h(
+            Row,
+            { key: 'hide-tabs', title: t('hideTabsTitle'), desc: t('hideTabsDesc') },
+            h('input', {
+              className: 'dshct-checkbox',
+              type: 'checkbox',
+              checked: snapshot.hideTabs,
+              'aria-label': t('hideTabsTitle'),
+              onChange: (event) => setHideTabs(event.target.checked),
+            }),
+          ),
+          h(
+            Row,
+            { key: 'compact-header', title: t('compactHeaderTitle'), desc: t('compactHeaderDesc') },
+            h('input', {
+              className: 'dshct-checkbox',
+              type: 'checkbox',
+              checked: snapshot.compactHeader,
+              'aria-label': t('compactHeaderTitle'),
+              onChange: (event) => setCompactHeader(event.target.checked),
+            }),
+          ),
+          h(
+            Row,
+            { key: 'desktop-titlebar', title: t('titlebarTitle'), desc: t('titlebarDesc') },
+            h(
+              'div',
+              { className: 'dshct-titlebar' },
+              h(
+                'button',
+                {
+                  className: 'dshct-button',
+                  type: 'button',
+                  disabled: titlebarDisabled,
+                  onClick: writeTitlebar,
+                },
+                titlebar.busy ? t('titlebarBusy') : t('titlebarAction'),
+              ),
+              h('div', { className: 'dshct-titlebarStatus', role: 'status' }, titlebarStatus()),
+            ),
+          ),
         ];
         return h(
           'div',
@@ -919,6 +1245,8 @@ window.__ModuleLoader__.load({
 
         let lineHeight = readLineHeight();
         let gutter = readGutter();
+        let hideTabs = readHideTabs();
+        let compactHeader = readCompactHeader();
         let resetVersion = 0;
         let version = 0;
         let cache = null;
@@ -941,6 +1269,8 @@ window.__ModuleLoader__.load({
               fontFamilies: { ...theme.fontFamilies },
               lineHeight,
               gutter,
+              hideTabs,
+              compactHeader,
               resetVersion,
             };
             return cache;
@@ -1023,6 +1353,30 @@ window.__ModuleLoader__.load({
           renderGutter();
           bump();
         };
+        /** Mirror the stored flag onto the root element the sheet keys off. */
+        const applyHideTabs = () => {
+          if (typeof document === 'undefined') return;
+          if (hideTabs) document.documentElement.setAttribute(HIDE_TABS_ATTR, '');
+          else document.documentElement.removeAttribute(HIDE_TABS_ATTR);
+        };
+        const setHideTabs = (value) => {
+          hideTabs = Boolean(value);
+          writeHideTabs(hideTabs);
+          applyHideTabs();
+          bump();
+        };
+        /** Mirror the stored compact-header flag onto the root element. */
+        const applyCompactHeader = () => {
+          if (typeof document === 'undefined') return;
+          if (compactHeader) document.documentElement.setAttribute(COMPACT_HEADER_ATTR, '');
+          else document.documentElement.removeAttribute(COMPACT_HEADER_ATTR);
+        };
+        const setCompactHeader = (value) => {
+          compactHeader = Boolean(value);
+          writeCompactHeader(compactHeader);
+          applyCompactHeader();
+          bump();
+        };
         const reset = () => {
           for (const role of ROLES) {
             ctx.theme.setFontSize(role, FONT_SIZE_SPECS[role].fallback);
@@ -1031,6 +1385,8 @@ window.__ModuleLoader__.load({
           resetVersion += 1;
           setLineHeight(LH_FALLBACK);
           setGutter(null);
+          setHideTabs(false);
+          setCompactHeader(false);
         };
 
         /**
@@ -1052,23 +1408,6 @@ window.__ModuleLoader__.load({
           const tag = mountStyle(ENCLOSED_STYLE_ID, ENCLOSED_CSS);
           return () => unmountStyle(tag);
         }, 'chat-typography: enclosed symbols');
-
-        ctx.effect(() => {
-          const tag = mountStyle(NAV_STYLE_ID, NAV_CSS);
-          const labels = new Set([zh.nav, en.nav]);
-          markNavRow(labels);
-          const body = document.body;
-          if (body === null) return () => unmountStyle(tag);
-          const observer = new MutationObserver(() => markNavRow(labels));
-          observer.observe(body, { childList: true });
-          return () => {
-            observer.disconnect();
-            unmountStyle(tag);
-            for (const row of document.querySelectorAll(`[${NAV_ATTR}]`)) {
-              row.removeAttribute(NAV_ATTR);
-            }
-          };
-        }, 'chat-typography: settings nav glyph');
 
         ctx.effect(() => {
           tableTag = mountStyle(TIGHT_TABLE_STYLE_ID, TIGHT_TABLE_CSS);
@@ -1093,13 +1432,43 @@ window.__ModuleLoader__.load({
           return () => unmountStyle(tag);
         }, 'chat-typography: tight header');
 
+        ctx.effect(() => {
+          const tag = mountStyle(HIDE_TABS_STYLE_ID, HIDE_TABS_CSS);
+          applyHideTabs();
+          return () => {
+            unmountStyle(tag);
+            if (typeof document !== 'undefined') {
+              document.documentElement.removeAttribute(HIDE_TABS_ATTR);
+            }
+          };
+        }, 'chat-typography: hide view tabs');
+
+        ctx.effect(() => {
+          const tag = mountStyle(COMPACT_HEADER_STYLE_ID, COMPACT_HEADER_CSS);
+          applyCompactHeader();
+          return () => {
+            unmountStyle(tag);
+            if (typeof document !== 'undefined') {
+              document.documentElement.removeAttribute(COMPACT_HEADER_ATTR);
+            }
+          };
+        }, 'chat-typography: compact header');
+
         ctx.effect(() => ctx.on('theme/change', bump), 'chat-typography: theme subscription');
 
-        const Section = createSection({ ctx, t, store, setLineHeight, setGutter, reset, canWriteFamily });
+        const Section = createSection({ ctx, t, store, setLineHeight, setGutter, setHideTabs, setCompactHeader, reset, canWriteFamily });
         ctx.slots.inject('settings.section', () =>
           ctx.slots.register(
             { name: 'settings.section', id: 'chat-typography', order: 20, label: () => t('nav'), locale: NS },
             Section,
+          ),
+        );
+
+        /* The shell keeps its gear until an icon carries this section's exact id. */
+        ctx.slots.inject('settings.section.icon', () =>
+          ctx.slots.register(
+            { name: 'settings.section.icon', id: 'chat-typography', order: 20 },
+            NavGlyph,
           ),
         );
       },
