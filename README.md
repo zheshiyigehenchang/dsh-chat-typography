@@ -119,17 +119,17 @@ markdown 正文自己带着 `font` 简写（里面点名了 `var(--dsw-font-fami
 
 它和「隐藏视图标签栏」相互独立：隐藏标签行时两者叠加得到 31px；标签行还显示时，宿主仍把标题栏下限锁在 76px，这一项只是把留白收紧，栏高仍是 76px。状态存在 localStorage `dsh-chat-typography.compactHeader`（`'1'` 为紧凑）。
 
-> 桌面端的**第一行**（文件 / 视图 / 运行 / 帮助、远程、窗口按钮）不归这里管：官方桌面版由 Electron 的原生 `titleBarOverlay` 画它，高度写在安装目录的 `app.asar` 里，页面 CSS 碰不到。要改它用下面的「桌面标题栏」按钮。
+> 桌面端的**第一行**（文件 / 视图 / 运行 / 帮助、远程、窗口按钮）不归这里管：官方桌面版由 Electron 的原生 `titleBarOverlay` 画它，高度写在安装目录的 `app.asar` 里，页面 CSS 碰不到。要改它用下面「桌面标题栏」那一项给出的命令。
 
 ### 桌面标题栏（28px）
 
 官方桌面版最上面一行是 Electron 的原生标题栏（`titleBarOverlay`），高度写死在安装目录的 `resources/app.asar` 里：`lib/main.js` 的主窗口 `titleBarOverlay.height`（默认 40）和 `lib/preload-app.cjs` 镜像给页面的 `--dsh-windows-titlebar-height`（默认 `40px`）。两者必须一起改，否则页面会按错的边距排版。
 
-设置页「桌面标题栏 → 写入 28px」按钮打开时会先 `GET` 一次真实状态，只有当本进程能写归档时才允许点击；桌面版里的 Host 永远写不了（见下面 Electron 那段），所以那里按钮是禁用的，状态行直接给出命令行。真正改字节的是 `scripts\patch-desktop-titlebar.mjs`：等长替换只换数字本身，文件长度不变，asar 头和所有偏移因此保持有效；第一次写入前会把整个 `app.asar` 备份到 `%TEMP%\dsh-app-asar-backup\app.asar.orig`。
+设置页里这一项**没有按钮**，只有一个可复制的命令和一行状态。原因很实在：桌面版里的 Host 永远写不了归档（见下面 Electron 那段），按钮在唯一需要它的地方恒为禁用；而「按钮 + 两行状态」又会把旁边的说明挤成一条窄缝。现在页面的职责只有两件——打开时 `GET` 一次真实状态，告诉你现在是多少 px；把要执行的命令摆出来并支持一键复制。真正改字节的是 `scripts\patch-desktop-titlebar.mjs`：等长替换只换数字本身，文件长度不变，asar 头和所有偏移因此保持有效；第一次写入前会把整个 `app.asar` 备份到 `%TEMP%\dsh-app-asar-backup\app.asar.orig`。
 
 写入后必须**完全退出 DSH 再启动**才生效（主进程已经加载了 `main.js`）。应用更新会覆盖 `app.asar`、恢复 40px，再跑一次脚本即可。非官方桌面版（浏览器 GUI）会返回「不适用」，不写任何文件。Host 半边是新增代码，安装或更新插件后需要重启一次 DSH 才会注册这条路由。
 
-Host 半边怎么找到 `app.asar`：桌面版把 Host 从包里拉起来，命令行里给的是包内路径 `…\resources\app.asar\dsh`（`argv[2]`），`app.asar` 本身**不作为独立的一段**出现，它的父目录才是真正的归档。所以除了认「以 `app.asar` 结尾的参数」，也认「`…\app.asar\…` 这种包内路径」——取到 `app.asar` 那一段为止。两种形状都只认命令行里真实存在的路径，不会去 LOCALAPPDATA 猜一个安装目录：浏览器 GUI 里点这个按钮不应该写别的副本。`DSHCT_DESKTOP_ASAR` 可以强制指定归档（测试用）。
+Host 半边怎么找到 `app.asar`：桌面版把 Host 从包里拉起来，命令行里给的是包内路径 `…\resources\app.asar\dsh`（`argv[2]`），`app.asar` 本身**不作为独立的一段**出现，它的父目录才是真正的归档。所以除了认「以 `app.asar` 结尾的参数」，也认「`…\app.asar\…` 这种包内路径」——取到 `app.asar` 那一段为止。两种形状都只认命令行里真实存在的路径，不会去 LOCALAPPDATA 猜一个安装目录：浏览器 GUI 里读这一项状态时不应该指向别的副本。`DSHCT_DESKTOP_ASAR` 可以强制指定归档（测试用）。
 
 **Electron 会改写 `app.asar` 的访问**：桌面版的 Host 跑在 Electron 的 Node 里，`fs` 被打过 asar 补丁——`openSync(…\app.asar, 'r')` 和 `'r+'` 都得到 `ENOENT, not found in …\app.asar`（归档本身在它眼里是虚拟目录，`statSync` 还回报 dir），只有归档内部的路径（`…\app.asar\lib\main.js`）才能打开。所以 Host 判断归档是否可用时探测的是内部那行 `lib/main.js`；读高度也是按内部路径读 `lib/main.js` / `lib/preload-app.cjs` 的字节，而不是去解析容器。同一补丁让 Host **完全写不了**归档：容器打不开，走内部路径的写入也不会落到真实字节上。写入因此只在命令行脚本里做——它跑在普通 Node 里，直接改归档字节。
 
@@ -137,17 +137,17 @@ Host 半边怎么找到 `app.asar`：桌面版把 Host 从包里拉起来，命�
 
 | 返回 | 含义 |
 | --- | --- |
-| `{"ok":true,"height":28,"preload":28,"writable":false,"path":…}` | 找到了归档，现在已经是 28px；按钮禁用，状态行写「无需修改」 |
-| `{"ok":true,"height":40,"preload":40,"writable":true,"path":…}` | 找到了归档并且这个进程能写（普通 Node 里才会出现，例如测试或 `DSHCT_DESKTOP_ASAR`），按钮可用 |
+| `{"ok":true,"height":28,"preload":28,"writable":false,"path":…}` | 找到了归档，现在已经是 28px；状态行写「无需修改」 |
+| `{"ok":true,"height":40,"preload":40,"writable":true,"path":…}` | 找到了归档，并且这个进程能写（普通 Node 里才会出现，例如测试或 `DSHCT_DESKTOP_ASAR`） |
 | `{"ok":false,"code":"not-desktop"}` | 命令行里没有包内路径：这是浏览器里的 Harness，或者 Host 不是由桌面版拉起的 |
 | `{"ok":false,"code":"no-marker","path":…}` | 归档找到了，但 `lib/main.js` 里没有唯一的「主窗口 + `titleBarOverlay.height:`」组合，或 preload 里没有镜像那行；宿主改写法后会出现 |
 | `{"ok":false,"code":"unreadable"}` / POST 返回 `{"code":"io"}` | 归档在、但读不到（或 Host 写不了——桌面版里总是这个结果） |
 
-> `writable` 说的是「这个进程现在能不能改归档字节」：桌面版里的 Host 恒为 `false`（Electron 的 asar 层不允许，见上），按钮随之禁用并把命令行写进状态行；命令行脚本在普通 Node 里跑，是真的就地写字节。
+> `writable` 说的是「这个进程现在能不能改归档字节」：桌面版里的 Host 恒为 `false`（Electron 的 asar 层不允许，见上）。设置页只用它之外的三件事：找到没有、现在多少 px、结构认不认识；写入一律交给命令行。
 
-按钮不会在状态未知时可用：设置页打开时先 `GET` 一次，只有「找到归档 + 当前还不是 28px」成立才允许点击，下面那行状态会直接写出当前高度、待重启、或为什么改不了（没找到 / 结构不认识 / 浏览器里不适用）。
+状态行会直接写出当前高度、已达标、或为什么读不到（没找到 / 结构不认识 / 权限不足）。`POST` 路由仍然保留，供脚本化调用；页面不再调用它。
 
-**已知限制**：桌面版里打开的那个界面，Host 半边可能是启动时打进归档视图的旧副本，与设置页显示的文案不一致。出现「文案变了、按钮还报错」时，不要反复点按钮，直接用命令行脚本改一次（见下）。
+**已知限制**：桌面版里打开的那个界面，Host 半边可能是启动时打进归档视图的旧副本，与设置页显示的文案不一致。出现「文案变了、状态还报错」时，直接用命令行脚本改一次（见下）。
 
 手动路径（可在桌面版运行时执行：脚本用普通 Node 直接改归档字节，会自动备份并跳过已经是 28px 的情况）：
 
@@ -169,7 +169,7 @@ node scripts\patch-desktop-titlebar.mjs 28
 | 左右留白 | 数字框 | 0–600px，留空 = 宿主默认 | localStorage `dsh-chat-typography.gutter` |
 | 隐藏视图标签栏 | 复选框 | 默认关闭（显示标签行） | localStorage `dsh-chat-typography.hideViewTabs` |
 | 紧凑会话标题栏 | 复选框 | 默认关闭（留白 5px / 41px） | localStorage `dsh-chat-typography.compactHeader` |
-| 桌面标题栏 | 按钮 | 写入 28px（官方默认 40） | 安装目录 `app.asar`（命令行脚本就地改写；桌面版内的 Host 受 Electron 限制，只给状态与提示） |
+| 桌面标题栏 | 命令 + 复制按钮 | 写入 28px（官方默认 40） | 安装目录 `app.asar`（命令行脚本就地改写；桌面版内的 Host 受 Electron 限制，只给状态与提示） |
 
 数字框回车或失焦提交；输入非法值会退回原值。
 
@@ -189,7 +189,7 @@ node scripts\patch-desktop-titlebar.mjs 28
 
 包目录不必放在 workspace 里；链接之后**源码即产物**，改 `client.js` 刷新页面就生效，不需要重新安装。
 
-装完**刷新页面**即可；新增的 Host 路由（桌面标题栏按钮）需要重启一次 Harness 才注册。验证：打开设置，导航里应出现「对话流排版」。
+装完**刷新页面**即可；新增的 Host 路由（读桌面标题栏状态）需要重启一次 Harness 才注册。验证：打开设置，导航里应出现「对话流排版」。
 
 ## 目录结构
 
@@ -198,8 +198,8 @@ dsh-chat-typography/
 ├── package.json          包清单：exports / files / dsh.bundle.patch / dsh.client
 ├── cordis.patch.yml      向 profile 插入 bundle 行的 patch
 ├── index.js              Host 半边：注册「桌面标题栏」写入路由
-├── client.js             全部实现：设置页 + 若干层样式 + 桌面标题栏按钮
-├── scripts/              命令行补丁脚本（与按钮同一套等长字节替换）
+├── client.js             全部实现：设置页 + 若干层样式 + 桌面标题栏状态与命令
+├── scripts/              命令行补丁脚本（等长字节替换，页面上的命令就是它）
 ├── locale/
 │   ├── zh.json           插件列表里的显示名与简介
 │   └── en.json
@@ -221,9 +221,63 @@ dsh-chat-typography/
 | 隐藏视图标签栏 | 同上，另加 `:has()`、`div.wSkVaW_tabs` 与 `[data-conversation-tabs]` | 仅勾选时 |
 | 紧凑标题栏 | 同上，留白归零 | 仅勾选时 |
 | 设置页导航图标 | 不是样式层：`settings.section.icon` 槽里注册的 `svg`（`id` 与本页 section 相同） | 常驻 |
+| 设置页满屏布局 | 设置对话框 `[data-shortcut-modal="settings"]`，仅 ≥900px | 常驻 |
+| 设置页宽度 | 本插件的 `.dshct-section`；宽度由 flex 连续决定，没有断点 | 常驻 |
+| 设置页文案折行 | `.dshct-*` 说明/状态行；`anywhere` + `text-wrap:pretty`，状态行在宽容器里改为右对齐 | 常驻 |
 | 左右留白 | `:has([data-chat-flow])` 上的 `--dsh-chat-content-width` | 仅在填了数值时 |
 
 后面这几层（行内代码、表格、代码卡片、标题栏）是**固定的紧凑化**，不提供开关，也不随任何设置变化。其共同做法是靠提高选择器特异性取胜（重复属性选择器 `[data-chat-flow][data-chat-flow]`、重复类名 `header.wSkVaW_header.wSkVaW_header`），**不使用 `!important`** —— 因为被覆盖的宿主规则本身都不是 `!important`。
+
+### 设置页满屏布局
+
+宿主把设置做成 `document.body` 上的模态：`role="presentation"` 的全屏层 + 模糊遮罩 + 居中 800×800 圆角卡片（左栏固定 `188px`，右侧 `minmax(0,1fr)`）。宿主没有暴露版式配置，所以这层只改**几何**、不动 DOM 与行为：
+
+```css
+@media (min-width:900px){
+  body div[role="presentation"]:has(> div[data-shortcut-modal="settings"]){display:block;background:none}
+  body div[role="presentation"]:has(> div[data-shortcut-modal="settings"])>[aria-hidden="true"]{display:none}
+  div[data-shortcut-modal="settings"]{
+    position:fixed;inset:var(--dsh-frame-chrome-top,0px) 0 0 0;
+    width:auto;height:auto;max-width:none;max-height:none;
+    border-radius:0;box-shadow:none;
+    grid-template-columns:clamp(180px,17vw,250px) minmax(0,1fr)}
+  div[data-shortcut-modal="settings"]>div:last-child{padding-inline:clamp(20px,3vw,40px)}
+  div[data-shortcut-modal="settings"]>div:last-child>*{max-width:980px;margin-inline:auto}
+}
+```
+
+- **锚点不靠类名哈希**：面板带宿主的稳定属性 `data-shortcut-modal="settings"`，外层是可判定的 `div[role="presentation"]`；`AnXs9G_*` 这类 CSS Modules 哈希每次构建都会变，一概不用。
+- **顶部留白**：`--dsh-frame-chrome-top` 正是宿主遮罩自己 `inset` 用的变量，桌面版 28px 原生标题栏下不会盖住窗口按钮；浏览器里该变量通常是 0。
+- **关闭方式不变**：右上角关闭按钮与 Escape 都还在（Escape 由宿主的 `useModalLayer` 管，不依赖遮罩），点遮罩关闭会随遮罩一起消失。
+- **只改列宽与盒子**：宿主 `AnXs9G_panel` 是单类选择器（特异性 0,1,0），上面 `div[data-shortcut-modal="settings"]` 是 0,1,1，宽高、`max-width` 与两列宽度都稳压；行 `minmax(0,1fr)`、单元格 `grid-area` 这些与布局无关的声明原样不动，所以横向 `<nav>`、纵向右栏都不需要重写。
+- **窄窗不碰**：`@media (min-width:900px)` 之外原样保留宿主的居中卡片；宿主自己在 767px 以下另有横向导航的移动版式，两者不冲突。
+- **内容列限宽 980px 居中**：正文字数多了会读串行，宽屏上因此把整列收在 980px；它随窗口等比居中外推，窗口窄到 900px 时正好过渡回宿主卡片。如果更想要「铺到边」，删掉最后两行即可。
+
+### 设置页内容跟着窗口走
+
+面板铺满了，内容还不该固定。`settings.section` 的那块内容在宿主里没有宽度约束，但本插件自己的 `.dshct-section` 原来钉死 `max-width:720px`，窗口再宽也只有 720px 的正文——现在改成 `width:100%;max-width:none`，跟着面板右栏的可用宽度连续伸缩。
+
+```css
+.dshct-section{width:100%;max-width:none}
+```
+
+这里**没有**用 `@container` / `@media` 断点：曾经加过一档「≥1040px 时说明放宽到 `52ch`」，结果拖动窗口时文字在断点两侧来回跳——越宽反而越早折行，看起来像折行突然变了。现在宽度只由 flex 连续决定，没有台阶：
+
+- 说明列 `.dshct-rowText` 用 `flex:1 1 0` 吃剩余宽度，控件按自身尺寸站住，窗口变宽说明列就跟着变宽，不存在阈值。
+- 字体栈输入框本来就吃空余宽度（`.dshct-row:has(.dshct-family) .dshct-control` 的 `440px / 52%` 上限），所以 section 变宽后它一起变宽，不需要额外规则。
+- 唯一保留的「宽/窄」差异是 `.dshct-rowWide` 内部：桌面标题栏的命令块与状态行始终上下排，宽窄都不改变摆法，因此也不会在拖动时跳变。
+
+### 说明文字怎么折行
+
+第 8 项「隐藏视图标签栏」和第 10 项「桌面标题栏」的说明都是两三行的长句。隐藏标签栏右边只有一个复选框，影响不大；桌面标题栏原本右边压着一整组控件（按钮 + 两行状态），实际可折行宽度只剩右栏的一半左右，一行只放七八个字、堆到六七行。
+
+现在这一行改成**整行上下排**（`.dshct-rowWide`）：说明先吃满整行，命令块和状态行排在下面，控件不再和说明抢同一行的宽度。这里刻意没有用 `flow-root` / `clear` 之类「一份说明横跨两列」的写法：`.dshct-row` 是 flex 行、以 `padding-bottom` 画分隔线，溢出内容会压到分隔线上，或让行高固定不下来。折行靠三件事：
+
+- **整行行**：`.dshct-rowWide{flex-direction:column;align-items:stretch}`，`.dshct-rowText` 去掉右侧 32px 内缩，`.dshct-control` 改成 `display:block;width:100%`。只有桌面标题栏用这个修饰类，其他行仍是左说明、右控件的紧凑排法。
+- **行内排版**：`.dshct-desc / .dshct-rowDesc / .dshct-groupTitle / .dshct-rowTitle / .dshct-titlebarStatus` 统一 `text-wrap:pretty`，中文在无可断处按标点断行，不会留下孤字；`overflow-wrap:anywhere` 兜底超长 URL 与字体栈。
+- **不把控件挤没**：`.dshct-rowText` 用 `flex:1 1 0` + `min-width:0`，说明只吃剩余宽度，控件按自身尺寸站住。
+
+字体栈输入框里的长值不进折行体系：输入框不换行，宽度不够时 `text-overflow:ellipsis` 出省略号，完整值仍在框内可横向滚动——这正是 `max-width:min(440px,52%)` 要的结果。
 
 **一个需要注意的坑：正文段落节奏的归零并不在常驻层里，而是「行距与间距」层的一部分。** 因此它跟着倍率走（倍率 1.00 同样生效），但如果行距层整个不挂载，正文节奏会退回宿主的 16px。
 

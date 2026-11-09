@@ -31,6 +31,8 @@ window.__ModuleLoader__.load({
     const ENCLOSED_STYLE_ID = `${PKG}/enclosed-symbols`;
     const HIDE_TABS_STYLE_ID = `${PKG}/hide-view-tabs`;
     const COMPACT_HEADER_STYLE_ID = `${PKG}/compact-header`;
+    const MERGED_STYLE_ID = `${PKG}/merged-settings`;
+    const WRAP_STYLE_ID = `${PKG}/copy-wrapping`;
 
     /** Independently configurable font roles, matching the Appearance section. */
     const ROLES = ['text', 'code', 'terminal'];
@@ -92,23 +94,19 @@ window.__ModuleLoader__.load({
         '把会话标题栏上下的 5px 留白归零：单行标题栏从约 41px 压到约 31px，字号和「标准模式」胶囊都不缩小。标签栏可见时宿主仍保留 76px 下限，这一项主要作用于单行标题栏。',
       titlebarTitle: '桌面标题栏',
       titlebarDesc:
-        '把官方桌面版最上面一行（文件 / 视图 / 运行 / 帮助与窗口按钮）压到 28px。高度写在安装目录的 app.asar 里，需要先改这个文件、再完全退出并重启 DSH 才生效；应用更新后会恢复原值，再改一次即可。桌面版里的按钮只负责读状态，写入用命令行脚本（下面会给出提示）。',
-      titlebarAction: '写入 28px',
-      titlebarBusy: '写入中…',
+        '把官方桌面版最上面一行（文件 / 视图 / 运行 / 帮助与窗口按钮）压到 28px。高度写在安装目录的 app.asar 里，桌面版里的 Host 改不了它（Electron 把归档当成虚拟目录），所以这里只读状态、给命令：在插件仓库根目录执行下面这条，改完完全退出 DSH 再启动。桌面版运行中也能执行，脚本直接改字节；应用更新会恢复原值，再改一次即可。',
+      titlebarCommand: 'node scripts\\patch-desktop-titlebar.mjs 28',
+      titlebarCopy: '复制命令',
+      titlebarCopied: '已复制',
       titlebarReading: '正在读取桌面版的 app.asar…',
       titlebarCurrent: (height) =>
-        `桌面版现在读取的标题栏高度是 ${height}px：点上面的按钮写入 28px，重启后生效。`,
-      titlebarAlready: '已经是 28px，无需修改。',
-      titlebarPatched: '已写入 28px：请完全退出 DSH 再启动。',
-      titlebarAtTarget: 'app.asar 已经是 28px，无需修改。命令行脚本写入后，完全退出 DSH 再启动即可看到。',
-      titlebarWillNeedExit: '写入前要完全退出 DSH（包括对话框开着也没关系，先退出桌面版），写入后再启动它。',
-      titlebarNoWrite:
-        '找到了 app.asar，但它现在是 ${height}px，而桌面版里的 Host 不能改它（Electron 把 app.asar 当虚拟目录，写进去不会落到文件里）。请在插件仓库根目录执行 node scripts\\patch-desktop-titlebar.mjs 28 改一次，写完完全退出 DSH 再启动。',
+        `桌面版现在读取的标题栏高度是 ${height}px。改成 28px：在插件仓库根目录执行上面这条命令，然后完全退出 DSH 再启动。`,
+      titlebarAtTarget: 'app.asar 已经是 28px。改完完全退出 DSH 再启动即可看到。',
       titlebarNotDesktop:
-        '没找到当前桌面版的 app.asar：只有官方桌面版能改写标题栏，浏览器里的 Harness 不适用。若你确实在用桌面版，请重启一次 DSH 再试。',
-      titlebarNoMarker: '这个 app.asar 里的标题栏高度写法不认识，未做修改（可用 scripts/patch-desktop-titlebar.mjs 手动处理）。',
-      titlebarNoAccess: '找到了 app.asar 但读写失败（可能权限不足），未做修改。',
-      titlebarFailed: '写入失败，请稍后再试。',
+        '没找到当前桌面版的 app.asar，读不到现在的标题栏高度；只有官方桌面版能改它，浏览器里的 Harness 不适用。若你确实在用桌面版，请重启一次 DSH 再看。',
+      titlebarNoMarker:
+        '这个 app.asar 里的标题栏高度写法不认识，不要执行上面的命令（脚本会拒绝写入）；换一个版本再试。',
+      titlebarNoAccess: '找到了 app.asar 但读不出来（可能权限不足）。',
       reset: '恢复默认',
       resetDesc: '字号、字体与间距都回到默认值。',
       resetAction: '重置',
@@ -144,23 +142,19 @@ window.__ModuleLoader__.load({
         'Zeroes the 5px padding above and below the conversation header, taking the single-line header from about 41px to about 31px. Font size and the “Standard mode” pill stay as they are. While the tab row is visible the host still floors the header at 76px, so this mainly affects the single-line header.',
       titlebarTitle: 'Desktop title bar',
       titlebarDesc:
-        'Shrinks the official desktop app’s top row (File / View / Run / Help and the window buttons) to 28px. The height lives in app.asar in the install directory, so it has to be changed there and then DSH fully quit and started again; app updates restore the original value, and one more pass reapplies it. The button in the desktop app only reads the state and points at the CLI script.',
-      titlebarAction: 'Write 28px',
-      titlebarBusy: 'Writing…',
+        'Shrinks the official desktop app’s top row (File / View / Run / Help and the window buttons) to 28px. The height lives in app.asar in the install directory, and the Host inside the desktop app cannot change it (Electron presents the archive as a virtual directory), so this row only reports the current height and gives you the command: run it from the plugin repository root, then fully quit and start DSH. It works while the desktop app is running — the script writes the bytes directly. App updates restore the original value, so one more pass reapplies it.',
+      titlebarCommand: 'node scripts\\patch-desktop-titlebar.mjs 28',
+      titlebarCopy: 'Copy command',
+      titlebarCopied: 'Copied',
       titlebarReading: 'Reading the desktop app’s app.asar…',
       titlebarCurrent: (height) =>
-        `The desktop app currently reads a ${height}px title bar: press the button above to write 28px, then restart.`,
-      titlebarAlready: 'Already 28px — nothing to do.',
-      titlebarPatched: 'Wrote 28px: fully quit and start DSH again.',
-      titlebarAtTarget: 'app.asar is already 28px — nothing to change. After the CLI script writes, fully quit and start DSH to see it.',
-      titlebarWillNeedExit: 'Writing needs DSH fully quit (closing the desktop app is enough); start it again afterwards.',
-      titlebarNoWrite:
-        (height) => `app.asar was found at ${height}px, but the Host inside the desktop app cannot change it (Electron treats app.asar as a virtual folder, so writes never reach the file). Run node scripts\\patch-desktop-titlebar.mjs 28 from the plugin repository root, then fully quit and start DSH again.`,
+        `The desktop app currently reads a ${height}px title bar. To make it 28px: run the command above from the plugin repository root, then fully quit and start DSH.`,
+      titlebarAtTarget: 'app.asar is already 28px. Fully quit and start DSH again to see it.',
       titlebarNotDesktop:
-        'Could not find the desktop app’s app.asar: only the official desktop app can be retuned here, a Harness page in a browser cannot. If you are in the desktop app, restart DSH and try again.',
-      titlebarNoMarker: 'The title bar height is written differently in this app.asar, so nothing was changed (scripts/patch-desktop-titlebar.mjs can do it by hand).',
-      titlebarNoAccess: 'Found app.asar but could not read or write it (permissions?), so nothing was changed.',
-      titlebarFailed: 'Writing failed. Please try again.',
+        'Could not find the desktop app’s app.asar, so the current height is unknown; only the official desktop app can be retuned, a Harness page in a browser cannot. If you are in the desktop app, restart DSH and look again.',
+      titlebarNoMarker:
+        'The title bar height is written differently in this app.asar, so do not run the command above (the script refuses that layout); try another build.',
+      titlebarNoAccess: 'Found app.asar but could not read it (permissions?).',
       reset: 'Restore defaults',
       resetDesc: 'Reset font size, font family, and spacing.',
       resetAction: 'Reset',
@@ -412,39 +406,75 @@ window.__ModuleLoader__.load({
       );
     }
 
-    /** Page chrome, drawn with theme tokens so both color schemes read correctly. */
+    /*
+     * 设置页的宽度预算：宿主把 `settings.section` 的内容放进一个滚动容器，
+     * 而本节默认只占 720px。面板一旦铺满窗口（见 `MERGED_CSS`），剩下的宽度
+     * 就成了浪费——这里让本节占满容器，并用容器查询在宽容器下放宽长文案，
+     * 让说明和控件在同一行读起来更顺。
+     */
     const PAGE_CSS = [
-      '.dshct-section{max-width:720px;color:var(--dsw-alias-label-primary);display:flex;flex-direction:column;gap:8px}',
+      '.dshct-section{width:100%;max-width:none;color:var(--dsw-alias-label-primary);display:flex;flex-direction:column;gap:8px}',
       '.dshct-title{margin:0;font-size:16px;font-weight:500;line-height:24px}',
       '.dshct-desc{margin:0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:20px}',
       '.dshct-group{display:flex;flex-direction:column;margin-top:8px}',
       '.dshct-groupTitle{margin-bottom:2px;color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:500;line-height:18px}',
       '.dshct-row{display:flex;align-items:center;gap:8px;padding:16px 0;border-bottom:.5px solid var(--dsw-alias-border-l2)}',
       '.dshct-row:last-child{border-bottom:none}',
-      '.dshct-rowText{display:flex;flex-direction:column;flex:1;gap:4px;min-width:0;padding-right:32px}',
+      /*
+       * 宽控件行（目前只有桌面标题栏：命令块 + 状态行）。它和普通行一样占满整行，
+       * 但改成上下排：说明先吃满整行宽度，控件放在下面。以前挤在右栏时，控件把
+       * 说明压成一条只放七八个字的窄缝，堆到六七行。
+       */
+      '.dshct-rowWide{flex-direction:column;align-items:stretch;gap:10px}',
+      '.dshct-rowWide .dshct-rowText{padding-right:0}',
+      '.dshct-rowWide .dshct-control{display:block;width:100%;min-width:0}',
+      /*
+       * 长说明（RESET_DESC 一整句、标题栏那段）要折行，而 `*:has([data-chat-flow])`
+       * 那族规则可能把 `white-space` 继承进设置对话框；这里显式钉回 `normal`，
+       * 再用 `flex-basis:0` 让说明只吃剩余宽度，不会按内容把控件挤没。
+       */
+      '.dshct-rowText{display:flex;flex-direction:column;flex:1 1 0;gap:4px;min-width:0;padding-right:32px;white-space:normal}',
       '.dshct-rowTitle{color:var(--dsw-alias-label-primary);font-size:14px;line-height:22px}',
       '.dshct-rowDesc{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}',
       '.dshct-control{display:inline-flex;align-items:center;gap:10px}',
       '.dshct-unit{min-width:20px;color:var(--dsw-alias-label-tertiary);font-size:13px;line-height:22px}',
       '.dshct-input{box-sizing:border-box;width:210px;height:36px;padding:0 10px;border-radius:var(--dsw-radius-md);border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13px}',
       '.dshct-input.dshct-number{width:96px;font-variant-numeric:tabular-nums}',
-      /*
-       * 字体栈长得像 `"Consolas", "Microsoft YaHei"`，210px 装不下第三行就看不见了。
+      /* 字体栈长得像 `"Consolas", "Microsoft YaHei"`，210px 装不下第三行就看不见了。
        * 这三个框改成吃掉行里的空余宽度：两个子项各占一半，再由 440px / 52% 封顶，
-       * 所以窄面板下只压到一半宽，不会把左侧说明挤没；数字框仍是固定 96px。
-       */
+       * 所以窄面板下只压到一半宽，不会把左侧说明挤没；数字框仍是固定 96px。 */
       '.dshct-row:has(.dshct-family) .dshct-control{flex:1 1 0;min-width:0;max-width:min(440px,52%)}',
-      '.dshct-input.dshct-family{width:100%;min-width:0}',
+      '.dshct-input.dshct-family{width:100%;min-width:0;text-overflow:ellipsis}',
       '.dshct-input:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:1px}',
       '.dshct-button{height:36px;padding:0 16px;border-radius:var(--dsw-radius-md);border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font-family:inherit;font-size:14px;cursor:pointer}',
       '.dshct-button:hover{background:var(--dsw-alias-interactive-bg-hover)}',
       '.dshct-button:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:1px}',
       '.dshct-button:disabled{opacity:.55;cursor:default}',
-      '.dshct-titlebar{display:flex;flex-direction:column;align-items:flex-end;gap:6px}',
-      '.dshct-titlebarStatus{max-width:260px;text-align:right;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}',
+      /*
+       * 标题栏这一行是整行的：命令块在左、复制按钮紧跟，状态行占满下面一行。
+       * 控件不再和说明抢同一行宽度，所以说明不会再被压成窄缝。
+       */
+      '.dshct-titlebar{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;max-width:100%}',
+      '.dshct-command{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}',
+      '.dshct-commandText{flex:0 1 auto;min-width:0;padding:8px 10px;border-radius:var(--dsw-radius-md);border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font-family:var(--dsw-font-family-mono,ui-monospace,SFMono-Regular,Consolas,monospace);font-size:12px;line-height:18px;white-space:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}',
+      '.dshct-copy{flex:none;height:30px;padding:0 10px;border-radius:var(--dsw-radius-md);border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font-family:inherit;font-size:12px;line-height:18px;cursor:pointer}',
+      '.dshct-copy:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+      '.dshct-copy:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:1px}',
+      '.dshct-titlebarStatus{max-width:100%;text-align:left;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}',
       '.dshct-checkbox{width:18px;height:18px;margin:0;cursor:pointer;accent-color:var(--dsw-alias-brand-primary)}',
       '.dshct-checkbox:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:2px}',
     ].join('');
+
+    /*
+     * 折行预算：说明文案可能很长。中文没有空格、浏览器默认也不在行首放标点，
+     * 所以既要允许「任意字符都能断」（超长 URL、字体栈），又要把 `text-wrap`
+     * 留在 `pretty` 上——它会让中文在无可断处按标点断行，而不是把一串长
+     * 路径/数字挤到下一行。`min-width:0` 只保证 flex 子项不撑破容器，
+     * 并不阻止一个超长词把列撑宽。
+     */
+    const WRAP_CSS =
+      '.dshct-desc,.dshct-rowDesc,.dshct-groupTitle,.dshct-rowTitle,.dshct-titlebarStatus' +
+      '{overflow-wrap:anywhere;word-break:normal;line-break:auto;text-wrap:pretty;min-width:0}';
 
     /**
      * One size for every run of text inside the conversation flow. The host ships
@@ -833,6 +863,47 @@ window.__ModuleLoader__.load({
       `html[${COMPACT_HEADER_ATTR}] header:has([data-conversation-tabs]):has([data-conversation-tabs])` +
       '{padding-top:0;padding-bottom:0}';
 
+    /**
+     * The Settings dialog re-laid out as a page of the frame.
+     *
+     * The shell (dsh-client-ui-settings-general, `SettingsPanel`) portals
+     * `overlay > mask + panel` onto `document.body`: an `inset:0` flex layer
+     * that centres a fixed 800x800 rounded card over a blurred mask, with the
+     * card's two columns pinned at `188px minmax(0,1fr)`. Nothing in the shell
+     * exposes that geometry, but two hooks are stable across builds: the
+     * wrapper's `role="presentation"` and the panel's
+     * `data-shortcut-modal="settings"` (the class names are CSS-module hashes
+     * that change whenever the shell is rebuilt).
+     *
+     * So this sheet keeps the shell's DOM and behaviour and only overrides
+     * geometry: the mask goes away, the panel covers the frame from just below
+     * the native title bar (`--dsh-frame-chrome-top`, the same variable the
+     * shell's own mask insets by) and the nav column scales with the window
+     * instead of sitting at a fixed 188px. Closing still works through the
+     * header button and Escape - `useModalLayer` owns the Escape listener, not
+     * the mask.
+     *
+     * Below 900px the shell's own mobile layout takes over (its breakpoint is
+     * 767px), so phone and narrow-window behaviour are untouched; between 768
+     * and 899 the stock centred card stays.
+     */
+    const MERGED_CSS =
+      '@media (min-width:900px){' +
+      'body div[role="presentation"]:has(> div[data-shortcut-modal="settings"])' +
+      '{display:block;background:none}' +
+      'body div[role="presentation"]:has(> div[data-shortcut-modal="settings"])>[aria-hidden="true"]' +
+      '{display:none}' +
+      'div[data-shortcut-modal="settings"]' +
+      '{position:fixed;inset:var(--dsh-frame-chrome-top,0px) 0 0 0;' +
+      'width:auto;height:auto;max-width:none;max-height:none;' +
+      'border-radius:0;box-shadow:none;' +
+      'grid-template-columns:clamp(180px,17vw,250px) minmax(0,1fr)}' +
+      'div[data-shortcut-modal="settings"]>div:last-child' +
+      '{padding-inline:clamp(20px,3vw,40px)}' +
+      'div[data-shortcut-modal="settings"]>div:last-child>*' +
+      '{max-width:980px;margin-inline:auto}' +
+      '}';
+
     /** Create or reuse this bundle's own style tag for one sheet id. */
     function mountStyle(id, css) {
       let tag = document.querySelector(`style[data-plugin-css=${JSON.stringify(id)}]`);
@@ -922,10 +993,10 @@ window.__ModuleLoader__.load({
     }
 
     /** One labelled preference row. */
-    function Row({ title, desc, children }) {
+    function Row({ title, desc, block, children }) {
       return h(
         'div',
-        { className: 'dshct-row' },
+        { className: block === true ? 'dshct-row dshct-rowWide' : 'dshct-row' },
         h(
           'div',
           { className: 'dshct-rowText' },
@@ -956,13 +1027,16 @@ window.__ModuleLoader__.load({
       const TARGET_TITLEBAR_HEIGHT = 28;
       return function ChatTypographySection() {
         const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-        const [titlebar, setTitlebar] = useState({ busy: false, message: '' });
         /**
-         * The host half can only read `app.asar`, never write it, while the
-         * desktop app is running: the app holds the archive open without write
-         * sharing. Every write therefore happens from a *separate* `dsh web`
-         * host, and this page says so instead of offering a button that fails.
-         * null means "not asked yet"; `supported: false` means a browser page.
+         * Read the archive's state once, on mount.
+         *
+         * The Host half is the only part that can look inside `app.asar`, and it
+         * can do just that: Electron serves the archive as a virtual folder, so a
+         * write from inside the desktop app never reaches the file. There is no
+         * button here any more — it could never be enabled where it would matter,
+         * and its label plus a second line squeezed the description beside it into
+         * a narrow column. What remains is the truth: the stored height, read into
+         * a one-line note under the command.
          */
         const [survey, setSurvey] = useState(null);
         useEffect(() => {
@@ -979,63 +1053,51 @@ window.__ModuleLoader__.load({
             live = false;
           };
         }, []);
-        const atTarget = survey?.ok === true && survey.height === TARGET_TITLEBAR_HEIGHT;
-        /** Write only where the archive is writable; otherwise explain what to do. */
-        const writeTitlebar = async () => {
-          if (titlebar.busy) return;
-          if (survey?.ok !== true) {
-            setTitlebar({ busy: false, message: survey ? t('titlebarNotDesktop') : t('titlebarWillNeedExit') });
+        /** Copy the command, with a short confirmation while the clipboard is in use. */
+        const [copied, setCopied] = useState(false);
+        useEffect(() => {
+          if (!copied) return undefined;
+          const timer = setTimeout(() => setCopied(false), 1500);
+          return () => clearTimeout(timer);
+        }, [copied]);
+        const copyCommand = () => {
+          const text = t('titlebarCommand');
+          const markCopied = () => setCopied(true);
+          if (navigator.clipboard?.writeText && window.isSecureContext !== false) {
+            navigator.clipboard.writeText(text).then(markCopied, markCopied);
             return;
           }
-          if (survey.writable !== true) {
-            setTitlebar({ busy: false, message: t('titlebarNoWrite')(survey.height) });
-            return;
-          }
-          setTitlebar({ busy: true, message: '' });
+          /** A file-loaded page has no Clipboard API; a hidden textarea still copies. */
+          const area = document.createElement('textarea');
+          area.value = text;
+          area.setAttribute('readonly', '');
+          area.style.position = 'fixed';
+          area.style.opacity = '0';
+          document.body.appendChild(area);
+          area.select();
           try {
-            const response = await fetch(apiPath('/chat-typography/api/windows-titlebar'), {
-              method: 'POST',
-              headers: { 'content-type': 'application/json', 'x-dshct-action': 'titlebar' },
-              body: JSON.stringify({ height: TARGET_TITLEBAR_HEIGHT }),
-            });
-            const data = await response.json().catch(() => null);
-            if (response.ok && data?.ok) {
-              setSurvey({ ok: true, height: TARGET_TITLEBAR_HEIGHT, writable: survey.writable });
-              setTitlebar({ busy: false, message: data.already ? t('titlebarAlready') : t('titlebarPatched') });
-              return;
-            }
-            const code = data?.code;
-            const message =
-              code === 'not-desktop'
-                ? t('titlebarNotDesktop')
-                : code === 'no-marker' || code === 'digit-count' || code === 'offset-drift'
-                  ? t('titlebarNoMarker')
-                  : code === 'io' || code === 'unreadable'
-                    ? t('titlebarNoAccess')
-                    : t('titlebarFailed');
-            setTitlebar({ busy: false, message });
-          } catch (_unreachable) {
-            setTitlebar({ busy: false, message: t('titlebarFailed') });
+            document.execCommand('copy');
+          } catch (_noCopy) {
+            /* nothing to report: the command is on screen anyway */
           }
+          area.remove();
+          markCopied();
         };
+        const atTarget = survey?.ok === true && survey.height === TARGET_TITLEBAR_HEIGHT;
         /**
-         * One line under the button, describing what is true now: the stored
-         * height, whether it still needs a restart, or why the write cannot
-         * happen from this very page.
+         * One line describing what is true now: the stored height, whether it
+         * already matches, or why the archive could not be read.
          */
         const titlebarStatus = () => {
-          if (titlebar.message !== '') return titlebar.message;
           if (survey === null) return t('titlebarReading');
           if (!survey.ok) {
-            return survey.code === 'no-marker' || survey.code === 'unreadable'
-              ? t('titlebarNoMarker')
-              : t('titlebarNotDesktop');
+            if (survey.code === 'no-marker') return t('titlebarNoMarker');
+            if (survey.code === 'unreadable' || survey.code === 'io') return t('titlebarNoAccess');
+            return t('titlebarNotDesktop');
           }
           if (atTarget) return t('titlebarAtTarget');
-          if (survey.writable === true) return t('titlebarCurrent')(survey.height);
-          return t('titlebarNoWrite')(survey.height);
+          return t('titlebarCurrent')(survey.height);
         };
-        const titlebarDisabled = titlebar.busy || survey === null || survey.ok !== true || survey.writable !== true || atTarget;
         /** Read a number field, or put the field back when it holds no number. */
         const readNumber = (input, shown) => {
           const raw = input.value.trim();
@@ -1193,19 +1255,19 @@ window.__ModuleLoader__.load({
           ),
           h(
             Row,
-            { key: 'desktop-titlebar', title: t('titlebarTitle'), desc: t('titlebarDesc') },
+            { key: 'desktop-titlebar', title: t('titlebarTitle'), desc: t('titlebarDesc'), block: true },
             h(
               'div',
               { className: 'dshct-titlebar' },
               h(
-                'button',
-                {
-                  className: 'dshct-button',
-                  type: 'button',
-                  disabled: titlebarDisabled,
-                  onClick: writeTitlebar,
-                },
-                titlebar.busy ? t('titlebarBusy') : t('titlebarAction'),
+                'div',
+                { className: 'dshct-command' },
+                h('code', { className: 'dshct-commandText' }, t('titlebarCommand')),
+                h(
+                  'button',
+                  { className: 'dshct-copy', type: 'button', onClick: copyCommand },
+                  copied ? t('titlebarCopied') : t('titlebarCopy'),
+                ),
               ),
               h('div', { className: 'dshct-titlebarStatus', role: 'status' }, titlebarStatus()),
             ),
@@ -1240,6 +1302,14 @@ window.__ModuleLoader__.load({
           const tag = mountStyle(PAGE_STYLE_ID, PAGE_CSS);
           return () => unmountStyle(tag);
         }, 'chat-typography: page styles');
+        ctx.effect(() => {
+          const tag = mountStyle(MERGED_STYLE_ID, MERGED_CSS);
+          return () => unmountStyle(tag);
+        }, 'chat-typography: merged settings layout');
+        ctx.effect(() => {
+          const tag = mountStyle(WRAP_STYLE_ID, WRAP_CSS);
+          return () => unmountStyle(tag);
+        }, 'chat-typography: copy wrapping');
 
         /** Font-family writes ride an undocumented Theme method; guard for it. */
         const canWriteFamily = typeof ctx.theme.setFontFamily === 'function';
