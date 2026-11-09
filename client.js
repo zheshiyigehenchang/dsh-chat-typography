@@ -92,7 +92,7 @@ window.__ModuleLoader__.load({
         '把会话标题栏上下的 5px 留白归零：单行标题栏从约 41px 压到约 31px，字号和「标准模式」胶囊都不缩小。标签栏可见时宿主仍保留 76px 下限，这一项主要作用于单行标题栏。',
       titlebarTitle: '桌面标题栏',
       titlebarDesc:
-        '把官方桌面版最上面一行（文件 / 视图 / 运行 / 帮助与窗口按钮）压到 28px。写入的是安装目录里的 app.asar，需要完全退出并重启 DSH 才生效；应用更新后会恢复原值，再点一次即可。如果它已经被改过，这里会直接告诉你状态，不必再点。',
+        '把官方桌面版最上面一行（文件 / 视图 / 运行 / 帮助与窗口按钮）压到 28px。高度写在安装目录的 app.asar 里，需要先改这个文件、再完全退出并重启 DSH 才生效；应用更新后会恢复原值，再改一次即可。桌面版里的按钮只负责读状态，写入用命令行脚本（下面会给出提示）。',
       titlebarAction: '写入 28px',
       titlebarBusy: '写入中…',
       titlebarReading: '正在读取桌面版的 app.asar…',
@@ -102,7 +102,8 @@ window.__ModuleLoader__.load({
       titlebarPatched: '已写入 28px：请完全退出 DSH 再启动。',
       titlebarPendingRestart: 'app.asar 已经是 28px：完全退出 DSH 再启动后生效。',
       titlebarWillNeedExit: '写入前要完全退出 DSH（包括对话框开着也没关系，先退出桌面版），写入后再启动它。',
-      titlebarNoWrite: '读得到 app.asar，但现在不能写：先完全退出桌面版（这一页会自动重连），再回来点一次，或直接用 scripts/patch-desktop-titlebar.mjs。',
+      titlebarNoWrite:
+        '找到了 app.asar，但它现在是 ${height}px，而桌面版里的 Host 不能改它（Electron 把 app.asar 当虚拟目录，写进去不会落到文件里）。请在插件仓库根目录执行 node scripts\\patch-desktop-titlebar.mjs 28 改一次，写完完全退出 DSH 再启动。',
       titlebarNotDesktop:
         '没找到当前桌面版的 app.asar：只有官方桌面版能改写标题栏，浏览器里的 Harness 不适用。若你确实在用桌面版，请重启一次 DSH 再试。',
       titlebarNoMarker: '这个 app.asar 里的标题栏高度写法不认识，未做修改（可用 scripts/patch-desktop-titlebar.mjs 手动处理）。',
@@ -143,7 +144,7 @@ window.__ModuleLoader__.load({
         'Zeroes the 5px padding above and below the conversation header, taking the single-line header from about 41px to about 31px. Font size and the “Standard mode” pill stay as they are. While the tab row is visible the host still floors the header at 76px, so this mainly affects the single-line header.',
       titlebarTitle: 'Desktop title bar',
       titlebarDesc:
-        'Shrinks the official desktop app’s top row (File / View / Run / Help and the window buttons) to 28px. It writes inside app.asar in the install directory, so DSH must be fully quit and started again; app updates restore the original value, and one more click reapplies it. If it has already been changed, the row says so instead of making you click.',
+        'Shrinks the official desktop app’s top row (File / View / Run / Help and the window buttons) to 28px. The height lives in app.asar in the install directory, so it has to be changed there and then DSH fully quit and started again; app updates restore the original value, and one more pass reapplies it. The button in the desktop app only reads the state and points at the CLI script.',
       titlebarAction: 'Write 28px',
       titlebarBusy: 'Writing…',
       titlebarReading: 'Reading the desktop app’s app.asar…',
@@ -154,7 +155,7 @@ window.__ModuleLoader__.load({
       titlebarPendingRestart: 'app.asar is already 28px: fully quit and start DSH to see it.',
       titlebarWillNeedExit: 'Writing needs DSH fully quit (closing the desktop app is enough); start it again afterwards.',
       titlebarNoWrite:
-        'app.asar is readable but not writable right now: fully quit the desktop app (this page reconnects on its own), then come back and press the button once more, or use scripts/patch-desktop-titlebar.mjs.',
+        (height) => `app.asar was found at ${height}px, but the Host inside the desktop app cannot change it (Electron treats app.asar as a virtual folder, so writes never reach the file). Run node scripts\\patch-desktop-titlebar.mjs 28 from the plugin repository root, then fully quit and start DSH again.`,
       titlebarNotDesktop:
         'Could not find the desktop app’s app.asar: only the official desktop app can be retuned here, a Harness page in a browser cannot. If you are in the desktop app, restart DSH and try again.',
       titlebarNoMarker: 'The title bar height is written differently in this app.asar, so nothing was changed (scripts/patch-desktop-titlebar.mjs can do it by hand).',
@@ -987,7 +988,7 @@ window.__ModuleLoader__.load({
             return;
           }
           if (survey.writable !== true) {
-            setTitlebar({ busy: false, message: t('titlebarNoWrite') });
+            setTitlebar({ busy: false, message: t('titlebarNoWrite')(survey.height) });
             return;
           }
           setTitlebar({ busy: true, message: '' });
@@ -1032,7 +1033,7 @@ window.__ModuleLoader__.load({
           }
           if (atTarget) return t('titlebarPendingRestart');
           if (survey.writable === true) return t('titlebarCurrent')(survey.height);
-          return t('titlebarNoWrite');
+          return t('titlebarNoWrite')(survey.height);
         };
         const titlebarDisabled = titlebar.busy || survey === null || survey.ok !== true || survey.writable !== true || atTarget;
         /** Read a number field, or put the field back when it holds no number. */

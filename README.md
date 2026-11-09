@@ -129,25 +129,35 @@ markdown 正文自己带着 `font` 简写（里面点名了 `var(--dsw-font-fami
 
 写入后必须**完全退出 DSH 再启动**才生效（主进程已经加载了 `main.js`）。应用更新会覆盖 `app.asar`、恢复 40px，再点一次即可。非官方桌面版（浏览器 GUI）会返回「不适用」，不写任何文件。Host 半边是新增代码，安装或更新插件后需要重启一次 DSH 才会注册这条路由。
 
-能不能写要现场试：设置页先用只读打开判断「找到没有、现在是多少」，再用 `r+` 试探回答「现在能不能写」，写不了时按钮直接禁用并说明原因。桌面版运行期间 `app.asar` 通常仍可写（实测 `r+` 与整字节写入都成功），但少数情况下会被拒（`EPERM`/`EBUSY`，例如更新程序正在替换文件）——这只影响「能不能立刻写」，不影响「写完要不要重启」：**任何情况下都要完全退出 DSH 再启动，新高度才会生效**。
+Host 半边怎么找到 `app.asar`：桌面版把 Host 从包里拉起来，命令行里给的是包内路径 `…\resources\app.asar\dsh`（`argv[2]`），`app.asar` 本身**不作为独立的一段**出现，它的父目录才是真正的归档。所以除了认「以 `app.asar` 结尾的参数」，也认「`…\app.asar\…` 这种包内路径」——取到 `app.asar` 那一段为止。两种形状都只认命令行里真实存在的路径，不会去 LOCALAPPDATA 猜一个安装目录：浏览器 GUI 里点这个按钮不应该写别的副本。`DSHCT_DESKTOP_ASAR` 可以强制指定归档（测试用）。
 
-Host 半边怎么找到 `app.asar`：桌面版把 Host 从包里拉起来，命令行里给的是包内路径 `…\resources\app.asar\dsh`（`argv[2]`），`app.asar` 本身**不作为独立的一段**出现，它的父目录才是真正的归档。所以除了认「以 `app.asar` 结尾的参数」，也认「`…\app.asar\…` 这种包内路径」——取到 `app.asar` 那一段为止，再确认它是个文件。两种形状都只认命令行里真实存在的路径，不会去 LOCALAPPDATA 猜一个安装目录：浏览器 GUI 里点这个按钮不应该写别的副本。`DSHCT_DESKTOP_ASAR` 可以强制指定归档（测试用）。
+**Electron 会改写 `app.asar` 的访问**：桌面版的 Host 跑在 Electron 的 Node 里，`fs` 被打过 asar 补丁——`openSync(…\app.asar)` 会得到 `ENOENT, not found in …\app.asar`（归档本身在它眼里是虚拟目录），只有归档内部的路径（`…\app.asar\lib\main.js`）才能打开。因此 Host 用「能不能打开 `lib/main.js`」来判断归档是否可用，而不是去开归档本身。写入也走同一条补丁：对归档内路径写，会落到旁挂的 `app.asar.unpacked`（`fsyncSync` 时真的刷盘）。两处字面量只差数字，`main.js` 被完整旁挂（一个字节都不变，只是改复制一份到 unpacked 而已），`preload-app.cjs` 的旁挂副本同样只差那几个字符。
 
 排查顺序（`GET /chat-typography/api/windows-titlebar` 会回报它找到的路径和当前高度）：
 
 | 返回 | 含义 |
 | --- | --- |
-| `{"ok":true,"height":40,"preload":40,"writable":true,"path":…}` | 找到了归档、现在可写，按钮可以直接写 |
-| `{"ok":true,…,"writable":false}` | 找到了归档，但当前进程不能以读写方式打开它（少数情况下 Windows 会锁住 `app.asar`，例如更新程序正在替换文件）；按钮会禁用并提示改用下面的命令行脚本 |
+| `{"ok":true,"height":28,"preload":28,"writable":false,"path":…}` | 找到了归档，现在已经是 28px；按钮禁用，状态行提示「重启后生效」 |
+| `{"ok":true,"height":40,"preload":40,"writable":true,"path":…}` | 找到了归档、可以写，按钮可用 |
 | `{"ok":false,"code":"not-desktop"}` | 命令行里没有包内路径：这是浏览器里的 Harness，或者 Host 不是由桌面版拉起的 |
 | `{"ok":false,"code":"no-marker","path":…}` | 归档找到了，但 `lib/main.js` 里没有唯一的「主窗口 + `titleBarOverlay.height:`」组合，或 preload 里没有镜像那行；宿主改写法后会出现 |
-| `{"ok":false,"code":"unreadable"}` / POST 返回 `{"code":"io"}` | 归档在、但读或写被拒绝（`EPERM`：桌面版正在运行时 Windows 可能锁住 `app.asar`，或者安装目录不在当前用户可写的范围内） |
+| `{"ok":false,"code":"unreadable"}` / POST 返回 `{"code":"io"}` | 归档在、但读不到或写不进去（权限不足、安装目录不在当前用户可写的范围内） |
 
-按钮不会在状态未知时可用：设置页打开时先 `GET` 一次，只有「找到归档 + 当前可写 + 还不是 28px」三条都成立才允许点击，下面那行状态会直接写出当前高度、或为什么改不了。
+> `writable` 由桌面版的 Electron 决定：归档本身永远不能以 `r+` 打开（见上），所以 Host 在桌面版里恒报 `false`，按钮随之禁用并提示改用命令行脚本；命令行脚本在普通 Node 里跑，是真的就地写字节，不受这条限制。
 
-**已知限制**：桌面版里打开的那个界面，Host 半边可能是启动时打进归档视图的旧副本，与设置页显示的文案不一致。出现「文案变了、按钮还报错」时，不要反复点按钮，直接用命令行脚本改一次（见下）。另：桌面版运行期间照样可以写（实测通过），但写完必须完全退出再启动。
+按钮不会在状态未知时可用：设置页打开时先 `GET` 一次，只有「找到归档 + 当前还不是 28px」成立才允许点击，下面那行状态会直接写出当前高度、待重启、或为什么改不了（没找到 / 结构不认识 / 浏览器里不适用）。
 
-`r+` 打不开时按钮会显示「找到了 app.asar 但读写失败」，不会动任何字节。手动路径（可在桌面版运行时执行，脚本会自动备份并跳过已经是 28px 的情况）：
+**已知限制**：桌面版里打开的那个界面，Host 半边可能是启动时打进归档视图的旧副本，与设置页显示的文案不一致。出现「文案变了、按钮还报错」时，不要反复点按钮，直接用命令行脚本改一次（见下）。
+
+手动路径（可在桌面版运行时执行：脚本用普通 Node 直接改归档字节，会自动备份并跳过已经是 28px 的情况）：
+
+```powershell
+# 在当前目录（插件仓库）下执行；脚本自己找安装目录的 app.asar
+node scripts\patch-desktop-titlebar.mjs 28
+# 需要时也可以显式给路径：node scripts\patch-desktop-titlebar.mjs 28 "C:\...\resources\app.asar"
+```
+
+注意 `cd` 到插件仓库根目录（`dsh-chat-typography\`）再运行：脚本在仓库的 `scripts\` 子目录里，在工作区顶层 `node scripts\...` 会报 `Cannot find module`。
 
 ```powershell
 # 在当前目录（插件仓库）下执行；脚本自己找安装目录的 app.asar
@@ -167,7 +177,7 @@ node scripts\patch-desktop-titlebar.mjs 28
 | 左右留白 | 数字框 | 0–600px，留空 = 宿主默认 | localStorage `dsh-chat-typography.gutter` |
 | 隐藏视图标签栏 | 复选框 | 默认关闭（显示标签行） | localStorage `dsh-chat-typography.hideViewTabs` |
 | 紧凑会话标题栏 | 复选框 | 默认关闭（留白 5px / 41px） | localStorage `dsh-chat-typography.compactHeader` |
-| 桌面标题栏 | 按钮 | 写入 28px（官方默认 40） | 安装目录 `app.asar`（Host 进程等长字节替换） |
+| 桌面标题栏 | 按钮 | 写入 28px（官方默认 40） | 安装目录 `app.asar`（命令行脚本就地改写；桌面版内的 Host 受 Electron 限制，只给状态与提示） |
 
 数字框回车或失焦提交；输入非法值会退回原值。
 

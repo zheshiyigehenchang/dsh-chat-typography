@@ -45,16 +45,15 @@ const SEP = sep;
  * directory is the real `app.asar`, and `argv[3]` is the profile directory.
  * Older launchers pass a plain `…\resources\app.asar` argument instead.
  *
- * What the answer may and may not be used for, because the archive is locked by
- * the running desktop app:
- * - Writing needs `r+`, which Windows refuses while the app (or even an earlier
- *   Host that is still shutting down) holds the file: that path only opens when
- *   nothing is running it, and answers `io` otherwise.
- * - Reading the two literals is allowed even while the app is running. Only a
- *   path that reads is returned here, and only a path taken from this process's
- *   own launch arguments: never a guessed install under LOCALAPPDATA, because a
- *   browser-only GUI patching another copy would be a write the user did not
- *   mean. `DSHCT_DESKTOP_ASAR` exists for tests.
+ * What the answer may and may not be used for:
+ * - This Host runs under Electron's patched `fs`, where the archive itself is a
+ *   virtual directory: `openSync(archive, 'r')` is ENOENT and a write is never
+ *   possible. Entries inside it open and stat normally, so the probe below reads
+ *   a real entry (`lib/main.js`) instead of opening the container.
+ * - Only a path that this probe resolves is returned, and only one taken from
+ *   this process's own launch arguments: never a guessed install under
+ *   LOCALAPPDATA, because a browser-only GUI patching another copy would be a
+ *   write the user did not mean. `DSHCT_DESKTOP_ASAR` exists for tests.
  * @returns {string | null}
  */
 function resolveAsarPath() {
@@ -65,27 +64,41 @@ function resolveAsarPath() {
     const lower = arg.toLowerCase();
     const inside = lower.indexOf(`${SEP}app.asar${SEP}`);
     if (inside > 0) {
-      const candidate = arg.slice(0, inside + 'app.asar'.length + 1);
+      const candidate = arg.slice(0, inside + 'app.asar'.length);
       if (isReadable(candidate)) return candidate;
       continue;
     }
-    if (lower.length > 'app.asar'.length && lower.endsWith(`${SEP}app.asar`)) {
-      if (isReadable(arg)) return arg;
+    const tail = `${SEP}app.asar`;
+    if (lower.endsWith(tail)) {
+      const candidate = arg.slice(0, arg.length - tail.length + 1 + 'app.asar'.length);
+      if (isReadable(candidate)) return candidate;
     }
   }
   return null;
 }
 
 /**
- * Can this archive be read right now? The running desktop app keeps it open
- * with a share mode that allows reads; `openSync` decides, not `statSync`.
- * The descriptor is only probed, never read, so nothing is grabbed from it.
- * @param {string} path
+ * Can this archive be read right now? Two runtimes have to agree here:
+ * - A plain Node process opens the archive as the file it is.
+ * - Electron's asar-aware `fs` makes it a virtual directory: opening the
+ *   container is ENOENT (`not found in …app.asar`) and only entries inside it
+ *   open, so the probe falls back to one known entry.
+ * Probing the container first keeps tests and the CLI script working, and the
+ * fallback is what a real desktop install needs.
+ * @param {string} asarPath
  */
-function isReadable(path) {
+function isReadable(asarPath) {
+  if (canOpen(asarPath)) return true;
+  return canOpen(join(asarPath, 'lib', 'main.js'));
+}
+
+/**
+ * @param {string} target
+ */
+function canOpen(target) {
   let fd = null;
   try {
-    fd = openSync(path, 'r');
+    fd = openSync(target, 'r');
     return true;
   } catch {
     return false;
@@ -218,6 +231,14 @@ function findHeights(mainBuf, preloadBuf) {
 
 /**
  * Patch both literals to `target`.
+ *
+ * Electron's patched `fs` routes every write on a path that traverses the
+ * archive virtual folder into `app.asar.unpacked/<same relative path>`, creating
+ * it on demand (`copyFileUnpackedIfNeedBe`). That is how a packaged app writes
+ * to itself, and both files have to be unpacked — the desktop main process reads
+ * `lib/main.js` back out of `app.asar` when it compiles the archive, the way it
+ * does for `lib/preload-app.cjs`. A plain Node process (the CLI script) writes
+ * the archive bytes in place instead.
  * @param {string} asarPath
  * @param {string} target two ASCII digits
  */
@@ -231,7 +252,18 @@ function patchHeight(asarPath, target) {
 
     const found = findHeights(readEntry(fd, dataStart, main), readEntry(fd, dataStart, preload));
     if (found === null) return { ok: false, code: 'no-marker' };
+    const mainPath = join(asarPath, 'lib', 'main.js');
+    const preloadPath = join(asarPath, 'lib', 'preload-app.cjs');
+    const unpacked = isUnpacked(mainPath) || isUnpacked(preloadPath);
     if (found.mainValue === target && found.preloadValue === target) {
+      // An unpacked copy outranks the archive, so "already" still has to make
+      // sure both copies say the target instead of trusting the archive alone.
+      if (!unpacked) return { ok: true, already: true, previous: target, height: target };
+      writeFully(fd, Buffer.from(target), dataStart + Number(main.offset) + found.mainDigitAt);
+      writeFully(fd, Buffer.from(`${target}px`), dataStart + Number(preload.offset) + found.preloadDigitAt);
+      fsyncSync(fd);
+      writeEntry(mainPath, target);
+      writeEntry(preloadPath, `${target}px`);
       return { ok: true, already: true, previous: target, height: target };
     }
     if (found.mainValue.length !== target.length || found.preloadValue.length !== target.length) {
@@ -252,9 +284,13 @@ function patchHeight(asarPath, target) {
       copyFileSync(asarPath, backupPath);
     }
 
+    // Archive first: under Electron the writes land in the unpacked copies, and
+    // `fsyncSync` on this descriptor is what commits them.
     writeFully(fd, Buffer.from(target), mainAt);
     writeFully(fd, Buffer.from(`${target}px`), preloadAt);
     fsyncSync(fd);
+    writeEntry(mainPath, target);
+    writeEntry(preloadPath, `${target}px`);
     return { ok: true, already: false, previous: found.mainValue, height: target, backupPath };
   } finally {
     try {
@@ -262,6 +298,48 @@ function patchHeight(asarPath, target) {
     } catch {
       /* ignore */
     }
+  }
+}
+
+/**
+ * Rewrite one literal through its archive entry path.
+ *
+ * Under Electron `openSync(…, 'r+')` on an archive-internal path succeeds and
+ * the writes go to `app.asar.unpacked`, which is the only writable half. In a
+ * plain Node process the same open would hand back the archive's own bytes (and
+ * a read-only container), so it is skipped: the archive was patched directly.
+ * @param {string} entryPath
+ * @param {string} literal the exact bytes to write at offset 0
+ */
+function writeEntry(entryPath, literal) {
+  let fd = null;
+  try {
+    fd = openSync(entryPath, 'r+');
+  } catch {
+    return;
+  }
+  try {
+    writeFully(fd, Buffer.from(literal), 0);
+    fsyncSync(fd);
+  } finally {
+    try {
+      closeSync(fd);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
+ * Does an unpacked copy of this archive entry already exist? When it does,
+ * Electron ignores the archive bytes and reads the copy, so both have to change.
+ * @param {string} entryPath an archive-internal path
+ */
+function isUnpacked(entryPath) {
+  try {
+    return existsSync(entryPath.replace(`${SEP}app.asar${SEP}`, `${SEP}app.asar.unpacked${SEP}`));
+  } catch {
+    return false;
   }
 }
 
@@ -320,9 +398,10 @@ function reportState(response) {
       }
     }
   }
-  // A read-only descriptor still cannot tell whether the write will be allowed:
-  // the desktop app shares the archive for reading, not for writing.
-  const writable = openForWrite(asarPath) === null;
+  // Opening the container for writing is never allowed inside Electron, so the
+  // answer is not a property of the archive: the write goes through
+  // app.asar.unpacked and is offered whenever the archive itself is readable.
+  const writable = true;
   if (found === null) {
     sendJson(response, 200, { ok: false, code: 'no-marker', path: asarPath, writable });
     return;
@@ -332,6 +411,11 @@ function reportState(response) {
 
 /**
  * Why `openSync(asarPath, 'r+')` would fail, if it would.
+ *
+ * Under Electron's asar-aware `fs` the container can never be opened, so this
+ * only tells the truth in a plain Node process (tests, the CLI script). The
+ * Host ignores it and reports `writable: false` instead, because the write it
+ * performs is redirected to `app.asar.unpacked` — see `patchHeight`.
  * @param {string} asarPath
  * @returns {string | null} an errno code, or null when the archive is writable
  */
