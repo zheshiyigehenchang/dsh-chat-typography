@@ -100,7 +100,7 @@ window.__ModuleLoader__.load({
         `桌面版现在读取的标题栏高度是 ${height}px：点上面的按钮写入 28px，重启后生效。`,
       titlebarAlready: '已经是 28px，无需修改。',
       titlebarPatched: '已写入 28px：请完全退出 DSH 再启动。',
-      titlebarPendingRestart: 'app.asar 已经是 28px：完全退出 DSH 再启动后生效。',
+      titlebarAtTarget: 'app.asar 已经是 28px，无需修改。命令行脚本写入后，完全退出 DSH 再启动即可看到。',
       titlebarWillNeedExit: '写入前要完全退出 DSH（包括对话框开着也没关系，先退出桌面版），写入后再启动它。',
       titlebarNoWrite:
         '找到了 app.asar，但它现在是 ${height}px，而桌面版里的 Host 不能改它（Electron 把 app.asar 当虚拟目录，写进去不会落到文件里）。请在插件仓库根目录执行 node scripts\\patch-desktop-titlebar.mjs 28 改一次，写完完全退出 DSH 再启动。',
@@ -152,7 +152,7 @@ window.__ModuleLoader__.load({
         `The desktop app currently reads a ${height}px title bar: press the button above to write 28px, then restart.`,
       titlebarAlready: 'Already 28px — nothing to do.',
       titlebarPatched: 'Wrote 28px: fully quit and start DSH again.',
-      titlebarPendingRestart: 'app.asar is already 28px: fully quit and start DSH to see it.',
+      titlebarAtTarget: 'app.asar is already 28px — nothing to change. After the CLI script writes, fully quit and start DSH to see it.',
       titlebarWillNeedExit: 'Writing needs DSH fully quit (closing the desktop app is enough); start it again afterwards.',
       titlebarNoWrite:
         (height) => `app.asar was found at ${height}px, but the Host inside the desktop app cannot change it (Electron treats app.asar as a virtual folder, so writes never reach the file). Run node scripts\\patch-desktop-titlebar.mjs 28 from the plugin repository root, then fully quit and start DSH again.`,
@@ -1031,7 +1031,7 @@ window.__ModuleLoader__.load({
               ? t('titlebarNoMarker')
               : t('titlebarNotDesktop');
           }
-          if (atTarget) return t('titlebarPendingRestart');
+          if (atTarget) return t('titlebarAtTarget');
           if (survey.writable === true) return t('titlebarCurrent')(survey.height);
           return t('titlebarNoWrite')(survey.height);
         };

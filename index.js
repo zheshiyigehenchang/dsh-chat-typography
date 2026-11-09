@@ -19,6 +19,7 @@ import {
   fsyncSync,
   mkdirSync,
   openSync,
+  readFileSync,
   readSync,
   writeSync,
 } from 'node:fs';
@@ -64,7 +65,9 @@ function resolveAsarPath() {
     const lower = arg.toLowerCase();
     const inside = lower.indexOf(`${SEP}app.asar${SEP}`);
     if (inside > 0) {
-      const candidate = arg.slice(0, inside + 'app.asar'.length);
+      // `inside` points at the separator in front of app.asar, so the archive
+      // ends one character past the segment itself: …\resources\app.asar
+      const candidate = arg.slice(0, inside + 1 + 'app.asar'.length);
       if (isReadable(candidate)) return candidate;
       continue;
     }
@@ -99,6 +102,27 @@ function canOpen(target) {
   let fd = null;
   try {
     fd = openSync(target, 'r');
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (fd !== null) {
+      try {
+        closeSync(fd);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
+/**
+ * @param {string} target
+ */
+function canOpenForWrite(target) {
+  let fd = null;
+  try {
+    fd = openSync(target, 'r+');
     return true;
   } catch {
     return false;
@@ -187,6 +211,43 @@ function readEntry(fd, dataStart, entry) {
 }
 
 /**
+ * Read one packaged file's bytes in whichever runtime is asking.
+ *
+ * Plain Node opens the container and slices the entry out of it. Electron's
+ * asar-aware `fs` refuses to open the container at all (it is a virtual
+ * directory), so the entry itself is read through its archive-internal path.
+ * @param {string} asarPath
+ * @param {string} rel slash-separated path inside the archive
+ */
+function readArtifact(asarPath, rel) {
+  try {
+    return readThroughContainer(asarPath, rel);
+  } catch {
+    return readFileSync(join(asarPath, ...rel.split('/')));
+  }
+}
+
+/**
+ * @param {string} asarPath
+ * @param {string} rel
+ */
+function readThroughContainer(asarPath, rel) {
+  const fd = openSync(asarPath, 'r');
+  try {
+    const { header, dataStart } = readHeader(fd);
+    const entry = entryOf(header, rel);
+    if (entry === null) throw new Error(`missing entry ${rel}`);
+    return readEntry(fd, dataStart, entry);
+  } finally {
+    try {
+      closeSync(fd);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
  * Find the primary window's overlay height and the preload mirror inside the
  * packaged sources. Pure byte scans: latin1 keeps one char per byte, so every
  * index is a file-relative byte offset.
@@ -243,7 +304,14 @@ function findHeights(mainBuf, preloadBuf) {
  * @param {string} target two ASCII digits
  */
 function patchHeight(asarPath, target) {
-  const fd = openSync(asarPath, 'r+');
+  let fd = null;
+  try {
+    fd = openSync(asarPath, 'r+');
+  } catch {
+    // Electron's asar-aware `fs` never opens the container for writing; the
+    // CLI script does this job in a plain Node process instead.
+    return { ok: false, code: 'io' };
+  }
   try {
     const { header, dataStart } = readHeader(fd);
     const main = entryOf(header, 'lib/main.js');
@@ -374,34 +442,20 @@ function reportState(response) {
     sendJson(response, 200, { ok: false, code: 'not-desktop' });
     return;
   }
+  // Can this process actually change the archive bytes? Inside Electron the
+  // answer is always no (its asar layer never opens the container for writing),
+  // and the unpacked copies it reads instead are only produced by the CLI
+  // script, so the desktop Host reports state and points there.
+  const writable = canOpenForWrite(asarPath);
   /** @type {{ height: number, preload: number } | null} */
   let found = null;
-  let fd = null;
   try {
-    fd = openSync(asarPath, 'r');
-    const { header, dataStart } = readHeader(fd);
-    const main = entryOf(header, 'lib/main.js');
-    const preload = entryOf(header, 'lib/preload-app.cjs');
-    if (main !== null && preload !== null) {
-      const heights = findHeights(readEntry(fd, dataStart, main), readEntry(fd, dataStart, preload));
-      if (heights !== null) found = { height: Number(heights.mainValue), preload: Number(heights.preloadValue) };
-    }
+    const heights = findHeights(readArtifact(asarPath, 'lib/main.js'), readArtifact(asarPath, 'lib/preload-app.cjs'));
+    if (heights !== null) found = { height: Number(heights.mainValue), preload: Number(heights.preloadValue) };
   } catch {
     sendJson(response, 200, { ok: false, code: 'unreadable', path: asarPath });
     return;
-  } finally {
-    if (fd !== null) {
-      try {
-        closeSync(fd);
-      } catch {
-        /* ignore */
-      }
-    }
   }
-  // Opening the container for writing is never allowed inside Electron, so the
-  // answer is not a property of the archive: the write goes through
-  // app.asar.unpacked and is offered whenever the archive itself is readable.
-  const writable = true;
   if (found === null) {
     sendJson(response, 200, { ok: false, code: 'no-marker', path: asarPath, writable });
     return;
