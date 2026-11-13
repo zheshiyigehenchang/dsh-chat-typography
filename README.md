@@ -24,6 +24,17 @@
 
 这个值写进 Harness 的主题设置，所以**和「外观」页共用同一份** —— 在哪一边改，另一边都跟着显示。
 
+### 终端字号：单独一格，或者跟着正文
+
+侧栏终端的字号在宿主里是**另一个**主题字段（`terminalFontSize`，范围 10–20px，默认 13），和正文字号没有关系：宿主只把它写进 `--dsh-terminal-font-size`，终端自己按这个值画。所以本插件给了两样东西：
+
+| 控件 | 作用 |
+| --- | --- |
+| 「终端」数字框 | 直接写 `terminalFontSize`，和「外观」页共用同一份设置 |
+| 「终端跟随正文」勾选框 | 打开后把正文字号镜像到终端（超出 20px 按 20px 算），上面的数字框变灰只读 |
+
+跟随是一面单向镜子：读 `text`、夹到 10–20、写 `terminal`；值相同就不写，避免自己触发 `theme/change` 再回到自己。所以正文字号一旦变化 —— 在这一页改，或在「外观」页改，甚至被别的插件改 —— 终端都会立刻跟上。关掉勾选框时终端**保留当前值**，不会弹回 13px，可以接着单独调。开关状态存在 `localStorage` 的 `dsh-chat-typography.terminalFollowText` 里（和其他几个开关一样只在浏览器端），「恢复默认」会把它关掉。
+
 ### 字体：文字 / 代码 / 终端 三种角色
 
 三个输入框分别设置 `text` / `code` / `terminal` 的字体族，留空即系统默认。写入走 Harness 的主题服务，所以**和「外观」页共用同一份设置** —— 在这一页改，外观页同步显示；在外观页改，这里也会跟着变。输入不需要自己加引号，服务会做清洗和补引号。
@@ -95,7 +106,7 @@ markdown 正文自己带着 `font` 简写（里面点名了 `var(--dsw-font-fami
 
 ### 恢复默认
 
-一键把三个字号回默认（14 / 11 / 13）、清空三个字体族、行距回 1.00、留白清空、视图标签栏恢复显示、紧凑标题栏关闭。
+一键把三个字号回默认（14 / 11 / 13）、清空三个字体族、行距回 1.00、留白清空、视图标签栏恢复显示、紧凑标题栏关闭、终端跟随正文关闭。
 
 ### 左右留白
 
@@ -119,37 +130,38 @@ markdown 正文自己带着 `font` 简写（里面点名了 `var(--dsw-font-fami
 
 它和「隐藏视图标签栏」相互独立：隐藏标签行时两者叠加得到 31px；标签行还显示时，宿主仍把标题栏下限锁在 76px，这一项只是把留白收紧，栏高仍是 76px。状态存在 localStorage `dsh-chat-typography.compactHeader`（`'1'` 为紧凑）。
 
-> 桌面端的**第一行**（文件 / 视图 / 运行 / 帮助、远程、窗口按钮）不归这里管：官方桌面版由 Electron 的原生 `titleBarOverlay` 画它，高度写在安装目录的 `app.asar` 里，页面 CSS 碰不到。要改它用下面「桌面标题栏」那一项给出的命令。
+> 桌面端的**第一行**（文件 / 视图 / 运行 / 帮助、远程、窗口按钮）不归这里管：官方桌面版由 Electron 的原生 `titleBarOverlay` 画它，高度写在安装目录的 `app.asar` 里，页面 CSS 碰不到。要改它用下面「桌面标题栏」那一项。
 
 ### 桌面标题栏（28px）
 
 官方桌面版最上面一行是 Electron 的原生标题栏（`titleBarOverlay`），高度写死在安装目录的 `resources/app.asar` 里：`lib/main.js` 的主窗口 `titleBarOverlay.height`（默认 40）和 `lib/preload-app.cjs` 镜像给页面的 `--dsh-windows-titlebar-height`（默认 `40px`）。两者必须一起改，否则页面会按错的边距排版。
 
-设置页里这一项**没有按钮**，只有一个可复制的命令和一行状态。原因很实在：桌面版里的 Host 永远写不了归档（见下面 Electron 那段），按钮在唯一需要它的地方恒为禁用；而「按钮 + 两行状态」又会把旁边的说明挤成一条窄缝。现在页面的职责只有两件——打开时 `GET` 一次真实状态，告诉你现在是多少 px；把要执行的命令摆出来并支持一键复制。真正改字节的是 `scripts\patch-desktop-titlebar.mjs`：等长替换只换数字本身，文件长度不变，asar 头和所有偏移因此保持有效；第一次写入前会把整个 `app.asar` 备份到 `%TEMP%\dsh-app-asar-backup\app.asar.orig`。
+设置页里这一项是**一个按钮 + 一行状态**：打开页面时先 `GET` 一次真实状态，能写才让按钮可点；点下去 `POST`，Host 就地改那两个数字，状态行随即变成「已写入 28px：请完全退出 DSH 再启动」。等长替换只换数字本身，文件长度不变，asar 头和所有偏移因此保持有效；第一次写入前会把整个 `app.asar` 备份到 `%TEMP%\dsh-app-asar-backup\app.asar.orig`。
 
-写入后必须**完全退出 DSH 再启动**才生效（主进程已经加载了 `main.js`）。应用更新会覆盖 `app.asar`、恢复 40px，再跑一次脚本即可。非官方桌面版（浏览器 GUI）会返回「不适用」，不写任何文件。Host 半边是新增代码，安装或更新插件后需要重启一次 DSH 才会注册这条路由。
+写入后必须**完全退出 DSH 再启动**才生效（主进程已经加载了 `main.js`）。应用更新会覆盖 `app.asar`、恢复 40px，回来再点一次即可。非官方桌面版（浏览器 GUI）会返回「不适用」，不写任何文件。Host 半边是新增代码，安装或更新插件后需要重启一次 DSH 才会注册这条路由。
 
 Host 半边怎么找到 `app.asar`：桌面版把 Host 从包里拉起来，命令行里给的是包内路径 `…\resources\app.asar\dsh`（`argv[2]`），`app.asar` 本身**不作为独立的一段**出现，它的父目录才是真正的归档。所以除了认「以 `app.asar` 结尾的参数」，也认「`…\app.asar\…` 这种包内路径」——取到 `app.asar` 那一段为止。两种形状都只认命令行里真实存在的路径，不会去 LOCALAPPDATA 猜一个安装目录：浏览器 GUI 里读这一项状态时不应该指向别的副本。`DSHCT_DESKTOP_ASAR` 可以强制指定归档（测试用）。
 
-**Electron 会改写 `app.asar` 的访问**：桌面版的 Host 跑在 Electron 的 Node 里，`fs` 被打过 asar 补丁——`openSync(…\app.asar, 'r')` 和 `'r+'` 都得到 `ENOENT, not found in …\app.asar`（归档本身在它眼里是虚拟目录，`statSync` 还回报 dir），只有归档内部的路径（`…\app.asar\lib\main.js`）才能打开。所以 Host 判断归档是否可用时探测的是内部那行 `lib/main.js`；读高度也是按内部路径读 `lib/main.js` / `lib/preload-app.cjs` 的字节，而不是去解析容器。同一补丁让 Host **完全写不了**归档：容器打不开，走内部路径的写入也不会落到真实字节上。写入因此只在命令行脚本里做——它跑在普通 Node 里，直接改归档字节。
+**Electron 会改写 `app.asar` 的访问**：桌面版的 Host 跑在 Electron 的 Node 里，`fs` 被打过 asar 补丁——`openSync(…\app.asar, 'r')` 和 `'r+'` 都得到 `ENOENT, not found in …\app.asar`（归档本身在它眼里是虚拟目录，`statSync` 还回报 dir），只有归档内部的路径（`…\app.asar\lib\main.js`）才能打开。所以 Host 判断归档是否可用时探测的是内部那行 `lib/main.js`；读高度也是按内部路径读 `lib/main.js` / `lib/preload-app.cjs` 的字节，而不是去解析容器。
+
+**写入走硬链接**：这个拦截看的是路径，不是文件。给归档建一个不含 `.asar` 段的硬链接（先试归档同目录，不行再退到临时目录），`openSync(link, 'r+')` 就是普通文件打开，写入直接落到真实字节上，写完 `fsync` 再删链接。因此桌面版里的按钮能直接改归档，不再需要命令行脚本；`writable` 也是拿这条真实路径探出来的，不是写死的常量。
 
 排查顺序（`GET /chat-typography/api/windows-titlebar` 会回报它找到的路径和当前高度）：
 
 | 返回 | 含义 |
 | --- | --- |
-| `{"ok":true,"height":28,"preload":28,"writable":false,"path":…}` | 找到了归档，现在已经是 28px；状态行写「无需修改」 |
-| `{"ok":true,"height":40,"preload":40,"writable":true,"path":…}` | 找到了归档，并且这个进程能写（普通 Node 里才会出现，例如测试或 `DSHCT_DESKTOP_ASAR`） |
+| `{"ok":true,"height":28,"preload":28,"writable":true,"path":…}` | 找到了归档、能写，而且已经是 28px；按钮禁用，状态行写「已经是 28px」 |
+| `{"ok":true,"height":40,"preload":40,"writable":true,"path":…}` | 找到了归档、能写，现在 40px；按钮可点 |
+| `{"ok":true,…,"writable":false}` | 找到了归档但这条写入路径不通（只读介质、权限、被别的程序独占）；按钮禁用并说明原因 |
 | `{"ok":false,"code":"not-desktop"}` | 命令行里没有包内路径：这是浏览器里的 Harness，或者 Host 不是由桌面版拉起的 |
 | `{"ok":false,"code":"no-marker","path":…}` | 归档找到了，但 `lib/main.js` 里没有唯一的「主窗口 + `titleBarOverlay.height:`」组合，或 preload 里没有镜像那行；宿主改写法后会出现 |
-| `{"ok":false,"code":"unreadable"}` / POST 返回 `{"code":"io"}` | 归档在、但读不到（或 Host 写不了——桌面版里总是这个结果） |
+| `{"ok":false,"code":"unreadable"}` / POST 返回 `{"code":"io"}` | 归档在、但读不到（或写不进去：权限、只读介质） |
 
-> `writable` 说的是「这个进程现在能不能改归档字节」：桌面版里的 Host 恒为 `false`（Electron 的 asar 层不允许，见上）。设置页只用它之外的三件事：找到没有、现在多少 px、结构认不认识；写入一律交给命令行。
+状态行会直接写出当前高度、已达标、或为什么读不到 / 写不了（没找到 / 结构不认识 / 权限不足）。`POST` 除了按钮，也仍可供脚本化调用（需要 `x-dshct-action: titlebar` 与 JSON 请求体）。
 
-状态行会直接写出当前高度、已达标、或为什么读不到（没找到 / 结构不认识 / 权限不足）。`POST` 路由仍然保留，供脚本化调用；页面不再调用它。
+**已知限制**：桌面版里打开的那个界面，Host 半边可能是启动时打进归档视图的旧副本，与设置页显示的文案不一致。出现「文案变了、状态还报错」时，完全退出 DSH 再启动一次，让 Host 重新加载。
 
-**已知限制**：桌面版里打开的那个界面，Host 半边可能是启动时打进归档视图的旧副本，与设置页显示的文案不一致。出现「文案变了、状态还报错」时，直接用命令行脚本改一次（见下）。
-
-手动路径（可在桌面版运行时执行：脚本用普通 Node 直接改归档字节，会自动备份并跳过已经是 28px 的情况）：
+命令行脚本仍然保留（例如 Host 没注册路由、或想在没有 DSH 的情况下改）：
 
 ```powershell
 # 在当前目录（插件仓库）下执行；脚本自己找安装目录的 app.asar
@@ -164,12 +176,14 @@ node scripts\patch-desktop-titlebar.mjs 28
 | 设置项 | 控件 | 范围与默认 | 存放位置 |
 | --- | --- | --- | --- |
 | 字号 | 数字框 | 10–22px，默认 14（宿主默认） | Harness 主题设置（与「外观」共用） |
+| 终端字号 | 数字框 | 10–20px，默认 13（宿主默认） | Harness 主题设置 `terminalFontSize`（与「外观」共用） |
+| 终端跟随正文 | 复选框 | 默认关闭 | localStorage `dsh-chat-typography.terminalFollowText` |
 | 字体 · 文字 / 代码 / 终端 | 文本框 | 留空 = 系统默认 | 同上 |
 | 行距 | 数字框 | 0.80–2.00，步进 0.05，默认 1.00 | localStorage `dsh-chat-typography.lineHeight` |
 | 左右留白 | 数字框 | 0–600px，留空 = 宿主默认 | localStorage `dsh-chat-typography.gutter` |
 | 隐藏视图标签栏 | 复选框 | 默认关闭（显示标签行） | localStorage `dsh-chat-typography.hideViewTabs` |
 | 紧凑会话标题栏 | 复选框 | 默认关闭（留白 5px / 41px） | localStorage `dsh-chat-typography.compactHeader` |
-| 桌面标题栏 | 命令 + 复制按钮 | 写入 28px（官方默认 40） | 安装目录 `app.asar`（命令行脚本就地改写；桌面版内的 Host 受 Electron 限制，只给状态与提示） |
+| 桌面标题栏 | 按钮 + 状态行 | 写入 28px（官方默认 40） | 安装目录 `app.asar`（Host 经硬链接就地改写，等长字节替换） |
 
 数字框回车或失焦提交；输入非法值会退回原值。
 
@@ -265,7 +279,7 @@ dsh-chat-typography/
 
 - 说明列 `.dshct-rowText` 用 `flex:1 1 0` 吃剩余宽度，控件按自身尺寸站住，窗口变宽说明列就跟着变宽，不存在阈值。
 - 字体栈输入框本来就吃空余宽度（`.dshct-row:has(.dshct-family) .dshct-control` 的 `440px / 52%` 上限），所以 section 变宽后它一起变宽，不需要额外规则。
-- 唯一保留的「宽/窄」差异是 `.dshct-rowWide` 内部：桌面标题栏的命令块与状态行始终上下排，宽窄都不改变摆法，因此也不会在拖动时跳变。
+- 唯一保留的「宽/窄」差异是 `.dshct-rowWide` 内部：桌面标题栏的按钮与状态行始终上下排，宽窄都不改变摆法，因此也不会在拖动时跳变。
 
 ### 说明文字怎么折行
 

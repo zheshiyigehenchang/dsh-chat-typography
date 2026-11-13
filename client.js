@@ -62,6 +62,8 @@ window.__ModuleLoader__.load({
     const COMPACT_HEADER_KEY = 'dsh-chat-typography.compactHeader';
     /** Root attribute the compact-header sheet keys off. */
     const COMPACT_HEADER_ATTR = 'data-dshct-compact-header';
+    /** localStorage key: `'1'` makes the terminal size follow the body size. */
+    const TERMINAL_FOLLOW_KEY = 'dsh-chat-typography.terminalFollowText';
 
     const zh = {
       nav: '对话流排版',
@@ -74,7 +76,11 @@ window.__ModuleLoader__.load({
       roleText: '正文',
       roleCode: '代码块',
       roleTerminal: '终端',
-      sizeTextDesc: '会话界面所有文字都使用这一个字号：标题、正文、代码与终端一起变化。',
+      sizeTextDesc: '会话界面所有文字都使用这一个字号：标题、正文、代码一起变化。侧栏终端单独设。',
+      sizeTerminalDesc: '侧栏终端里字符的字号（10–20px）。和正文字号是两份设置：勾选下面的「跟随正文」就不用手动改。',
+      terminalFollowTitle: '终端跟随正文',
+      terminalFollowDesc:
+        '打开后，终端字号跟着正文字号走（超过 20px 按 20px 算），上面的输入框变成只读；关掉后终端保留当前值，可以单独改。',
       familyTextDesc: '留空则使用系统默认字体。',
       familyCodeDesc: '留空则使用系统默认等宽字体。',
       familyTerminalDesc: '留空则使用系统默认等宽字体。',
@@ -94,19 +100,17 @@ window.__ModuleLoader__.load({
         '把会话标题栏上下的 5px 留白归零：单行标题栏从约 41px 压到约 31px，字号和「标准模式」胶囊都不缩小。标签栏可见时宿主仍保留 76px 下限，这一项主要作用于单行标题栏。',
       titlebarTitle: '桌面标题栏',
       titlebarDesc:
-        '把官方桌面版最上面一行（文件 / 视图 / 运行 / 帮助与窗口按钮）压到 28px。高度写在安装目录的 app.asar 里，桌面版里的 Host 改不了它（Electron 把归档当成虚拟目录），所以这里只读状态、给命令：在插件仓库根目录执行下面这条，改完完全退出 DSH 再启动。桌面版运行中也能执行，脚本直接改字节；应用更新会恢复原值，再改一次即可。',
-      titlebarCommand: 'node scripts\\patch-desktop-titlebar.mjs 28',
-      titlebarCopy: '复制命令',
-      titlebarCopied: '已复制',
+        '把官方桌面版最上面一行（文件 / 视图 / 运行 / 帮助与窗口按钮）压到 28px。改完要完全退出 DSH 再启动才生效；应用更新会恢复原值，回来再点一次即可。',
+      titlebarAction: '写入 28px',
+      titlebarBusy: '写入中…',
+      titlebarPatched: '已写入 28px：请完全退出 DSH 再启动。',
+      titlebarAlready: '已经是 28px，无需修改。',
       titlebarReading: '正在读取桌面版的 app.asar…',
-      titlebarCurrent: (height) =>
-        `桌面版现在读取的标题栏高度是 ${height}px。改成 28px：在插件仓库根目录执行上面这条命令，然后完全退出 DSH 再启动。`,
-      titlebarAtTarget: 'app.asar 已经是 28px。改完完全退出 DSH 再启动即可看到。',
-      titlebarNotDesktop:
-        '没找到当前桌面版的 app.asar，读不到现在的标题栏高度；只有官方桌面版能改它，浏览器里的 Harness 不适用。若你确实在用桌面版，请重启一次 DSH 再看。',
-      titlebarNoMarker:
-        '这个 app.asar 里的标题栏高度写法不认识，不要执行上面的命令（脚本会拒绝写入）；换一个版本再试。',
-      titlebarNoAccess: '找到了 app.asar 但读不出来（可能权限不足）。',
+      titlebarCurrent: (height) => `现在是 ${height}px。`,
+      titlebarNotDesktop: '没找到桌面版的 app.asar：只有官方桌面版能改它。',
+      titlebarNoMarker: '这个 app.asar 里的写法不认识，未做修改。',
+      titlebarNoAccess: '找到了 app.asar 但读写失败（可能权限不足）。',
+      titlebarFailed: '写入失败，请稍后再试。',
       reset: '恢复默认',
       resetDesc: '字号、字体与间距都回到默认值。',
       resetAction: '重置',
@@ -122,7 +126,11 @@ window.__ModuleLoader__.load({
       roleText: 'Body',
       roleCode: 'Code',
       roleTerminal: 'Terminal',
-      sizeTextDesc: 'One size for every run of text in the conversation: headings, body, code and terminal all follow it.',
+      sizeTextDesc: 'One size for every run of text in the conversation: headings, body and code all follow it. The sidebar terminal is set separately.',
+      sizeTerminalDesc: 'The cell size of the sidebar terminal (10–20px). It is a separate setting from the body size; turn on “Follow body” below to skip it.',
+      terminalFollowTitle: 'Terminal follows body',
+      terminalFollowDesc:
+        'While on, the terminal size tracks the body size (capped at 20px) and the field above becomes read-only. While off, the terminal keeps its current size and can be changed on its own.',
       familyTextDesc: 'Empty uses the system default font.',
       familyCodeDesc: 'Empty uses the system default monospace font.',
       familyTerminalDesc: 'Empty uses the system default monospace font.',
@@ -142,19 +150,17 @@ window.__ModuleLoader__.load({
         'Zeroes the 5px padding above and below the conversation header, taking the single-line header from about 41px to about 31px. Font size and the “Standard mode” pill stay as they are. While the tab row is visible the host still floors the header at 76px, so this mainly affects the single-line header.',
       titlebarTitle: 'Desktop title bar',
       titlebarDesc:
-        'Shrinks the official desktop app’s top row (File / View / Run / Help and the window buttons) to 28px. The height lives in app.asar in the install directory, and the Host inside the desktop app cannot change it (Electron presents the archive as a virtual directory), so this row only reports the current height and gives you the command: run it from the plugin repository root, then fully quit and start DSH. It works while the desktop app is running — the script writes the bytes directly. App updates restore the original value, so one more pass reapplies it.',
-      titlebarCommand: 'node scripts\\patch-desktop-titlebar.mjs 28',
-      titlebarCopy: 'Copy command',
-      titlebarCopied: 'Copied',
+        'Shrinks the official desktop app’s top row (File / View / Run / Help and the window buttons) to 28px. Fully quit and start DSH again to see it; app updates restore the original value, so one more click reapplies it.',
+      titlebarAction: 'Write 28px',
+      titlebarBusy: 'Writing…',
+      titlebarPatched: 'Wrote 28px — fully quit and start DSH.',
+      titlebarAlready: 'Already 28px, nothing to change.',
       titlebarReading: 'Reading the desktop app’s app.asar…',
-      titlebarCurrent: (height) =>
-        `The desktop app currently reads a ${height}px title bar. To make it 28px: run the command above from the plugin repository root, then fully quit and start DSH.`,
-      titlebarAtTarget: 'app.asar is already 28px. Fully quit and start DSH again to see it.',
-      titlebarNotDesktop:
-        'Could not find the desktop app’s app.asar, so the current height is unknown; only the official desktop app can be retuned, a Harness page in a browser cannot. If you are in the desktop app, restart DSH and look again.',
-      titlebarNoMarker:
-        'The title bar height is written differently in this app.asar, so do not run the command above (the script refuses that layout); try another build.',
-      titlebarNoAccess: 'Found app.asar but could not read it (permissions?).',
+      titlebarCurrent: (height) => `Currently ${height}px.`,
+      titlebarNotDesktop: 'Could not find the desktop app’s app.asar: only the official desktop app can be retuned.',
+      titlebarNoMarker: 'The title bar height is written differently in this app.asar, so nothing was changed.',
+      titlebarNoAccess: 'Found app.asar but could not read or write it (permissions?).',
+      titlebarFailed: 'The write failed. Try again later.',
       reset: 'Restore defaults',
       resetDesc: 'Reset font size, font family, and spacing.',
       resetAction: 'Reset',
@@ -258,6 +264,27 @@ window.__ModuleLoader__.load({
       try {
         if (value) localStorage.setItem(COMPACT_HEADER_KEY, '1');
         else localStorage.removeItem(COMPACT_HEADER_KEY);
+      } catch (_storageUnavailable) {
+        /* The value still applies for this page session. */
+      }
+    }
+
+    /** Read the stored follow-text flag; anything but `'1'` keeps the two sizes apart. */
+    function readTerminalFollow() {
+      if (typeof localStorage === 'undefined') return false;
+      try {
+        return localStorage.getItem(TERMINAL_FOLLOW_KEY) === '1';
+      } catch (_storageUnavailable) {
+        return false;
+      }
+    }
+
+    /** Persist the follow-text flag, dropping the key again when it is off. */
+    function writeTerminalFollow(value) {
+      if (typeof localStorage === 'undefined') return;
+      try {
+        if (value) localStorage.setItem(TERMINAL_FOLLOW_KEY, '1');
+        else localStorage.removeItem(TERMINAL_FOLLOW_KEY);
       } catch (_storageUnavailable) {
         /* The value still applies for this page session. */
       }
@@ -446,20 +473,20 @@ window.__ModuleLoader__.load({
       '.dshct-row:has(.dshct-family) .dshct-control{flex:1 1 0;min-width:0;max-width:min(440px,52%)}',
       '.dshct-input.dshct-family{width:100%;min-width:0;text-overflow:ellipsis}',
       '.dshct-input:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:1px}',
+      /* 终端字号跟随正文时这个框只显示值、不接受输入。 */
+      '.dshct-input:disabled{opacity:.55;cursor:default;background:var(--dsw-alias-bg-layer-1)}',
       '.dshct-button{height:36px;padding:0 16px;border-radius:var(--dsw-radius-md);border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font-family:inherit;font-size:14px;cursor:pointer}',
       '.dshct-button:hover{background:var(--dsw-alias-interactive-bg-hover)}',
       '.dshct-button:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:1px}',
       '.dshct-button:disabled{opacity:.55;cursor:default}',
       /*
-       * 标题栏这一行是整行的：命令块在左、复制按钮紧跟，状态行占满下面一行。
-       * 控件不再和说明抢同一行宽度，所以说明不会再被压成窄缝。
+       * 标题栏这一行：按钮在左，状态行在下面一行。控件不再和说明抢同一行宽度。
        */
-      '.dshct-titlebar{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;max-width:100%}',
-      '.dshct-command{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}',
-      '.dshct-commandText{flex:0 1 auto;min-width:0;padding:8px 10px;border-radius:var(--dsw-radius-md);border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font-family:var(--dsw-font-family-mono,ui-monospace,SFMono-Regular,Consolas,monospace);font-size:12px;line-height:18px;white-space:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}',
-      '.dshct-copy{flex:none;height:30px;padding:0 10px;border-radius:var(--dsw-radius-md);border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font-family:inherit;font-size:12px;line-height:18px;cursor:pointer}',
-      '.dshct-copy:hover{background:var(--dsw-alias-interactive-bg-hover)}',
-      '.dshct-copy:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:1px}',
+      '.dshct-titlebar{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0;max-width:100%}',
+      '.dshct-write{height:32px;padding:0 14px;border-radius:var(--dsw-radius-md);border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13px;cursor:pointer}',
+      '.dshct-write:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}',
+      '.dshct-write:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:1px}',
+      '.dshct-write:disabled{opacity:.55;cursor:default}',
       '.dshct-titlebarStatus{max-width:100%;text-align:left;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}',
       '.dshct-checkbox{width:18px;height:18px;margin:0;cursor:pointer;accent-color:var(--dsw-alias-brand-primary)}',
       '.dshct-checkbox:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:2px}',
@@ -1013,7 +1040,18 @@ window.__ModuleLoader__.load({
      * @returns the section component registered into `settings.section`.
      */
     function createSection(deps) {
-      const { ctx, t, store, setLineHeight, setGutter, setHideTabs, setCompactHeader, reset, canWriteFamily } = deps;
+      const {
+        ctx,
+        t,
+        store,
+        setLineHeight,
+        setGutter,
+        setHideTabs,
+        setCompactHeader,
+        setTerminalFollow,
+        reset,
+        canWriteFamily,
+      } = deps;
       const { subscribe, getSnapshot } = store;
       /** Clamp one typed size into the role's range and write it to the theme. */
       const setSize = (role, value) => {
@@ -1030,13 +1068,9 @@ window.__ModuleLoader__.load({
         /**
          * Read the archive's state once, on mount.
          *
-         * The Host half is the only part that can look inside `app.asar`, and it
-         * can do just that: Electron serves the archive as a virtual folder, so a
-         * write from inside the desktop app never reaches the file. There is no
-         * button here any more — it could never be enabled where it would matter,
-         * and its label plus a second line squeezed the description beside it into
-         * a narrow column. What remains is the truth: the stored height, read into
-         * a one-line note under the command.
+         * The Host half is the only part that can look inside `app.asar`; the
+         * answer also says whether it can write the two literals right now, and
+         * that is what decides whether the button is offered at all.
          */
         const [survey, setSurvey] = useState(null);
         useEffect(() => {
@@ -1053,49 +1087,55 @@ window.__ModuleLoader__.load({
             live = false;
           };
         }, []);
-        /** Copy the command, with a short confirmation while the clipboard is in use. */
-        const [copied, setCopied] = useState(false);
-        useEffect(() => {
-          if (!copied) return undefined;
-          const timer = setTimeout(() => setCopied(false), 1500);
-          return () => clearTimeout(timer);
-        }, [copied]);
-        const copyCommand = () => {
-          const text = t('titlebarCommand');
-          const markCopied = () => setCopied(true);
-          if (navigator.clipboard?.writeText && window.isSecureContext !== false) {
-            navigator.clipboard.writeText(text).then(markCopied, markCopied);
-            return;
-          }
-          /** A file-loaded page has no Clipboard API; a hidden textarea still copies. */
-          const area = document.createElement('textarea');
-          area.value = text;
-          area.setAttribute('readonly', '');
-          area.style.position = 'fixed';
-          area.style.opacity = '0';
-          document.body.appendChild(area);
-          area.select();
-          try {
-            document.execCommand('copy');
-          } catch (_noCopy) {
-            /* nothing to report: the command is on screen anyway */
-          }
-          area.remove();
-          markCopied();
-        };
+        /** The last write result, cleared as soon as a new attempt starts. */
+        const [write, setWrite] = useState({ busy: false, code: null, message: null });
         const atTarget = survey?.ok === true && survey.height === TARGET_TITLEBAR_HEIGHT;
+        const canWrite = survey?.ok === true && survey.writable === true && !atTarget;
+        const writeTitlebar = () => {
+          if (!canWrite || write.busy) return;
+          setWrite({ busy: true, code: null, message: null });
+          fetch(apiPath('/chat-typography/api/windows-titlebar'), {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'x-dshct-action': 'titlebar' },
+            body: JSON.stringify({ height: TARGET_TITLEBAR_HEIGHT }),
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              if (data?.ok === true) {
+                setSurvey({ ok: true, height: TARGET_TITLEBAR_HEIGHT, writable: survey.writable });
+                setWrite({
+                  busy: false,
+                  code: null,
+                  message: data.already === true ? t('titlebarAlready') : t('titlebarPatched'),
+                });
+                return;
+              }
+              const code = typeof data?.code === 'string' ? data.code : 'unknown';
+              setWrite({ busy: false, code, message: null });
+            })
+            .catch(() => {
+              setWrite({ busy: false, code: 'unknown', message: null });
+            });
+        };
         /**
-         * One line describing what is true now: the stored height, whether it
-         * already matches, or why the archive could not be read.
+         * One line describing what is true now: the last write, the stored
+         * height, whether it already matches, or why the archive is unreachable.
          */
         const titlebarStatus = () => {
+          if (write.message !== null) return write.message;
+          if (write.code !== null) {
+            if (write.code === 'not-desktop') return t('titlebarNotDesktop');
+            if (write.code === 'no-marker') return t('titlebarNoMarker');
+            if (write.code === 'io' || write.code === 'unreadable') return t('titlebarNoAccess');
+            return t('titlebarFailed');
+          }
           if (survey === null) return t('titlebarReading');
           if (!survey.ok) {
             if (survey.code === 'no-marker') return t('titlebarNoMarker');
             if (survey.code === 'unreadable' || survey.code === 'io') return t('titlebarNoAccess');
             return t('titlebarNotDesktop');
           }
-          if (atTarget) return t('titlebarAtTarget');
+          if (atTarget) return t('titlebarAlready');
           return t('titlebarCurrent')(survey.height);
         };
         /** Read a number field, or put the field back when it holds no number. */
@@ -1158,6 +1198,38 @@ window.__ModuleLoader__.load({
               },
             }),
             h('span', { className: 'dshct-unit' }, 'px'),
+          ),
+          h(
+            Row,
+            { key: 'size-terminal', title: t('roleTerminal'), desc: t('sizeTerminalDesc') },
+            h('input', {
+              /* Disabled while the size follows the body, and re-keyed when it stops. */
+              key: `size-terminal:${snapshot.fontSizes.terminal}:${snapshot.terminalFollow}:${snapshot.resetVersion}`,
+              className: 'dshct-input dshct-number',
+              type: 'number',
+              min: FONT_SIZE_SPECS.terminal.min,
+              max: FONT_SIZE_SPECS.terminal.max,
+              step: 1,
+              defaultValue: String(snapshot.fontSizes.terminal),
+              disabled: snapshot.terminalFollow,
+              'aria-label': t('roleTerminal'),
+              onBlur: (event) => commitSize('terminal', event.target),
+              onKeyDown: (event) => {
+                if (event.key === 'Enter') commitSize('terminal', event.currentTarget);
+              },
+            }),
+            h('span', { className: 'dshct-unit' }, 'px'),
+          ),
+          h(
+            Row,
+            { key: 'terminal-follow', title: t('terminalFollowTitle'), desc: t('terminalFollowDesc') },
+            h('input', {
+              className: 'dshct-checkbox',
+              type: 'checkbox',
+              checked: snapshot.terminalFollow,
+              'aria-label': t('terminalFollowTitle'),
+              onChange: (event) => setTerminalFollow(event.target.checked),
+            }),
           ),
         ];
         const familyRows = canWriteFamily
@@ -1255,19 +1327,19 @@ window.__ModuleLoader__.load({
           ),
           h(
             Row,
-            { key: 'desktop-titlebar', title: t('titlebarTitle'), desc: t('titlebarDesc'), block: true },
+            { key: 'desktop-titlebar', title: t('titlebarTitle'), desc: t('titlebarDesc') },
             h(
               'div',
               { className: 'dshct-titlebar' },
               h(
-                'div',
-                { className: 'dshct-command' },
-                h('code', { className: 'dshct-commandText' }, t('titlebarCommand')),
-                h(
-                  'button',
-                  { className: 'dshct-copy', type: 'button', onClick: copyCommand },
-                  copied ? t('titlebarCopied') : t('titlebarCopy'),
-                ),
+                'button',
+                {
+                  className: 'dshct-write',
+                  type: 'button',
+                  disabled: !canWrite || write.busy,
+                  onClick: writeTitlebar,
+                },
+                write.busy ? t('titlebarBusy') : t('titlebarAction'),
               ),
               h('div', { className: 'dshct-titlebarStatus', role: 'status' }, titlebarStatus()),
             ),
@@ -1318,6 +1390,7 @@ window.__ModuleLoader__.load({
         let gutter = readGutter();
         let hideTabs = readHideTabs();
         let compactHeader = readCompactHeader();
+        let terminalFollow = readTerminalFollow();
         let resetVersion = 0;
         let version = 0;
         let cache = null;
@@ -1342,6 +1415,7 @@ window.__ModuleLoader__.load({
               gutter,
               hideTabs,
               compactHeader,
+              terminalFollow,
               resetVersion,
             };
             return cache;
@@ -1448,6 +1522,30 @@ window.__ModuleLoader__.load({
           applyCompactHeader();
           bump();
         };
+        /**
+         * Copy the body size onto the terminal while the follow switch is on.
+         *
+         * The terminal role is the sidebar terminal's cell size, and it is a
+         * separate Theme field — nothing in the host ties it to the body. Follow
+         * mode is therefore a one-way mirror: read `text`, clamp it into the
+         * terminal range (10–20), write `terminal`. Writing only when the two
+         * differ keeps this idempotent, because the write itself emits
+         * `theme/change` and lands right back here.
+         */
+        const syncTerminalFollow = () => {
+          if (!terminalFollow) return;
+          const spec = FONT_SIZE_SPECS.terminal;
+          const sizes = ctx.theme.getTheme().fontSizes;
+          const target = Math.min(spec.max, Math.max(spec.min, Math.round(sizes.text)));
+          if (sizes.terminal === target) return;
+          ctx.theme.setFontSize('terminal', target);
+        };
+        const setTerminalFollow = (value) => {
+          terminalFollow = Boolean(value);
+          writeTerminalFollow(terminalFollow);
+          syncTerminalFollow();
+          bump();
+        };
         const reset = () => {
           for (const role of ROLES) {
             ctx.theme.setFontSize(role, FONT_SIZE_SPECS[role].fallback);
@@ -1458,6 +1556,7 @@ window.__ModuleLoader__.load({
           setGutter(null);
           setHideTabs(false);
           setCompactHeader(false);
+          setTerminalFollow(false);
         };
 
         /**
@@ -1525,9 +1624,36 @@ window.__ModuleLoader__.load({
           };
         }, 'chat-typography: compact header');
 
-        ctx.effect(() => ctx.on('theme/change', bump), 'chat-typography: theme subscription');
+        /**
+         * Keep the terminal on the body size while follow mode is on.
+         *
+         * One subscription carries both jobs: follow mode needs every
+         * `theme/change` (the body size may have moved in Appearance, or the
+         * terminal role was written elsewhere), and the page needs to repaint.
+         * The first run happens at mount, because a page loaded with follow
+         * already on has to catch up with a body size that changed while it was
+         * closed.
+         */
+        ctx.effect(() => {
+          syncTerminalFollow();
+          return ctx.on('theme/change', () => {
+            syncTerminalFollow();
+            bump();
+          });
+        }, 'chat-typography: theme subscription');
 
-        const Section = createSection({ ctx, t, store, setLineHeight, setGutter, setHideTabs, setCompactHeader, reset, canWriteFamily });
+        const Section = createSection({
+          ctx,
+          t,
+          store,
+          setLineHeight,
+          setGutter,
+          setHideTabs,
+          setCompactHeader,
+          setTerminalFollow,
+          reset,
+          canWriteFamily,
+        });
         ctx.slots.inject('settings.section', () =>
           ctx.slots.register(
             { name: 'settings.section', id: 'chat-typography', order: 20, label: () => t('nav'), locale: NS },
